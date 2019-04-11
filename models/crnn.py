@@ -223,6 +223,12 @@ def tf_input_fn(params, is_training):
             img = tf.reshape(img, [original_h, original_w, 3])
             w = tf.maximum(tf.cast(original_w, tf.float32),1.0)
             h = tf.maximum(tf.cast(original_h, tf.float32),1.0)
+            min_ration = 4.0/tf.minimum(w,h)
+            max_ratio = tf.maximum(min_ration,1.0)
+            ratio = tf.random_uniform((),minval=min_ration,maxval=max_ratio,dtype=tf.float32)
+            w = tf.ceil(w*ratio)
+            h = tf.ceil(h*ratio)
+            img = tf.image.resize_images(img, [tf.cast(h,tf.int32), tf.cast(w,tf.int32)])
             ratio_w = tf.maximum(w / max_width, 1.0)
             ratio_h = tf.maximum(h / 32.0, 1.0)
             ratio = tf.maximum(ratio_w, ratio_h)
@@ -234,10 +240,8 @@ def tf_input_fn(params, is_training):
             img = tf.image.pad_to_bounding_box(img, 0, 0, nh + padh, nw + padw)
             img = tf.cast(img, tf.float32) / 127.5 - 1
             label = tf.sparse_tensor_to_dense(res['image/class'])
-            logging.info("Label: {}".format(label))
             label = tf.reshape(label, [-1])
             label = tf.cast(label, tf.int32)
-            logging.info("Label: {}".format(label))
             return img, label
 
         ds = ds.map(_parser)
