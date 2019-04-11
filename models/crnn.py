@@ -223,7 +223,7 @@ def tf_input_fn(params, is_training):
             img = tf.reshape(img, [original_h, original_w, 3])
             w = tf.maximum(tf.cast(original_w, tf.float32),1.0)
             h = tf.maximum(tf.cast(original_h, tf.float32),1.0)
-            min_ration = 4.0/tf.minimum(w,h)
+            min_ration = 6.0/tf.minimum(w,h)
             max_ratio = tf.maximum(min_ration,1.0)
             ratio = tf.random_uniform((),minval=min_ration,maxval=max_ratio,dtype=tf.float32)
             w = tf.ceil(w*ratio)
