@@ -10,6 +10,7 @@ import PIL.Image
 import numpy as np
 import os
 import random
+import math
 
 ENGLISH_CHAR_MAP = [
     '#',
@@ -110,8 +111,8 @@ def full_generated_input_fn(params, is_training):
             min_ration = 6.0/float(min(width,height))
             max_ratio = max(min_ration,1.0)
             ratio = random.random()*(max_ratio-min_ration)+min_ration
-            width = int(tf.ceil(ratio*width))
-            height = int(tf.ceil(ratio*height))
+            width = int(math.ceil(ratio*width))
+            height = int(math.ceil(ratio*height))
             image = image.resize((width, height))
             ration_w = max(width / max_width, 1.0)
             ration_h = max(height / 32.0, 1.0)
