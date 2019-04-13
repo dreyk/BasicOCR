@@ -109,7 +109,7 @@ def full_generated_input_fn(params, is_training):
             label = get_str_labels(char_map, label)
             image = PIL.Image.open(filename)
             width, height = image.size
-            min_ration = 6.0/float(min(width,height))
+            min_ration = 10.0/float(min(width,height))
             max_ratio = max(min_ration,1.0)
             ratio = random.random()*(max_ratio-min_ration)+min_ration
             width = int(math.ceil(ratio*width))
