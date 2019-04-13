@@ -264,6 +264,7 @@ def tf_input_fn(params, is_training):
             )
             original_h = size[0]
             original_w = size[1]
+            img = tf.reshape(img, [original_h, original_w, 3])
             w = tf.maximum(tf.cast(original_w, tf.float32),1.0)
             h = tf.maximum(tf.cast(original_h, tf.float32),1.0)
             min_ration = 10.0/tf.minimum(w,h)
