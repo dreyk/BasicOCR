@@ -33,6 +33,7 @@ def read_charset():
 
     return charset, inv_charset
 
+wide_charset = None
 
 def get_str_labels(char_map, v, add_eos=True):
     v = v.strip()
@@ -207,36 +208,65 @@ def generated_input_fn(params, is_training):
 
     return _input_fn
 
+def _crop_py(img, ymin, xmin, ymax,xmax,texts):
+    i = random.randrange(len(ymin))
+    y0 = max(ymin[i],0)
+    x0 = max(xmin[i],0)
+    y1 = min(ymax[i],img.shape[0])
+    x1 = min(xmax[i],img.shape[1])
+    return img[y0:y1,x0:x1,:],np.array(get_str_labels(wide_charset, texts[i]),np.int32)
+
 
 def tf_input_fn(params, is_training):
     max_width = params['max_width']
+    global wide_charset
+    wide_charset = params['charset']
     batch_size = params['batch_size']
     datasets_files = []
     for tf_file in glob.iglob(params['data_set'] + '/*.tfrecord'):
         datasets_files.append(tf_file)
     def _input_fn():
         ds = tf.data.TFRecordDataset(datasets_files, buffer_size=256 * 1024 * 1024)
-
         def _parser(example):
             zero = tf.zeros([1], dtype=tf.int64)
             features = {
                 'image/encoded':
                     tf.FixedLenFeature((), tf.string, default_value=''),
-                'image/height':
-                    tf.FixedLenFeature([1], tf.int64, default_value=zero),
-                'image/width':
-                    tf.FixedLenFeature([1], tf.int64, default_value=zero),
-                'image/class':
-                    tf.VarLenFeature(tf.int64),
+                'image/shape':
+                    tf.FixedLenFeature(3, tf.int64),
+                'image/object/bbox/xmin':
+                    tf.VarLenFeature(tf.float32),
+                'image/object/bbox/xmax':
+                    tf.VarLenFeature(tf.float32),
+                'image/object/bbox/ymin':
+                    tf.VarLenFeature(tf.float32),
+                'image/object/bbox/ymax':
+                    tf.VarLenFeature(tf.float32),
+                'image/object/bbox/label_text':
+                    tf.VarLenFeature(tf.string),
             }
             res = tf.parse_single_example(example, features)
-            img = tf.image.decode_png(res['image/encoded'], channels=3)
-            original_w = tf.cast(res['image/width'][0], tf.int32)
-            original_h = tf.cast(res['image/height'][0], tf.int32)
+            img = tf.image.decode_jpeg(res['image/encoded'], channels=3)
+            original_w = tf.cast(res['image/shape'][1], tf.int32)
+            original_h = tf.cast(res['image/shape'][0], tf.int32)
             img = tf.reshape(img, [original_h, original_w, 3])
+            original_w = tf.cast(original_w, tf.float32)
+            original_h = tf.cast(original_h, tf.float32)
+            ymin = tf.cast(tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/ymin']), tf.float32)*original_h,tf.int32)
+            xmin = tf.cast(tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/xmin']), tf.float32)*original_w,tf.int32)
+            xmax = tf.cast(tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/xmax']), tf.float32)*original_w,tf.int32)
+            ymax = tf.cast(tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/ymax']), tf.float32)*original_h,tf.int32)
+            texts = tf.sparse_tensor_to_dense(res['image/object/bbox/label_text'],default_value='')
+            img,label = tf.py_func(
+                _crop_py,
+                [img,ymin, xmin, ymax,xmax,texts],
+                [tf.uint8,tf.int32]
+            )
+            original_h = img.shape[0]
+            original_w = img.shape[1]
             w = tf.maximum(tf.cast(original_w, tf.float32),1.0)
             h = tf.maximum(tf.cast(original_h, tf.float32),1.0)
-            min_ration = 6.0/tf.minimum(w,h)
+            min_ration = 10.0/tf.minimum(w,h)
             max_ratio = tf.maximum(min_ration,1.0)
             ratio = tf.random_uniform((),minval=min_ration,maxval=max_ratio,dtype=tf.float32)
             w = tf.ceil(w*ratio)
@@ -252,8 +282,6 @@ def tf_input_fn(params, is_training):
             padh = tf.maximum(0, 32 - nh)
             img = tf.image.pad_to_bounding_box(img, 0, 0, nh + padh, nw + padw)
             img = tf.cast(img, tf.float32) / 127.5 - 1
-            label = tf.sparse_tensor_to_dense(res['image/class'])
-            label = tf.reshape(label, [-1])
             label = tf.cast(label, tf.int32)
             return img, label
 

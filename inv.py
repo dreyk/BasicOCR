@@ -51,3 +51,37 @@ pages = convert_from_path('invoice.pdf', 500)
 if len(pages)>0:
     for page in pages:
         page.save('invoice.jpg', 'JPEG')
+
+
+def _parser(example):
+    zero = tf.zeros([1], dtype=tf.int64)
+    features = {
+        'image/encoded':
+            tf.FixedLenFeature((), tf.string, default_value=''),
+        'image/shape':
+            tf.FixedLenFeature(3, tf.int64),
+        'image/object/bbox/xmin':
+            tf.VarLenFeature(tf.float32),
+        'image/object/bbox/xmax':
+            tf.VarLenFeature(tf.float32),
+        'image/object/bbox/ymin':
+            tf.VarLenFeature(tf.float32),
+        'image/object/bbox/ymax':
+            tf.VarLenFeature(tf.float32),
+        'image/object/bbox/label':
+            tf.VarLenFeature(tf.int64)
+    }
+    res = tf.parse_single_example(example, features)
+    img = tf.image.decode_jpeg(res['image/encoded'], channels=3)
+    original_w = tf.cast(res['image/shape'][1], tf.int32)
+    original_h = tf.cast(res['image/shape'][0], tf.int32)
+    img = tf.reshape(img, [original_h, original_w, 3])
+    ymin = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/ymin']*original_h), tf.int32)
+    xmin = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/xmin']*original_w), tf.int32)
+    xmax = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/xmax']*original_w), tf.int32)
+    ymax = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/ymax']*original_h), tf.int32)
+    imgs,labels = tf.py_func(
+        crop_py,
+        [img, ymin, xmin, ymax,xmax,res['image/object/bbox/label']],
+        [tf.int32,tf.int32]
+    )
