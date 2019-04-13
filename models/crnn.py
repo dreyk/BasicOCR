@@ -224,7 +224,7 @@ def tf_input_fn(params, is_training):
     wide_charset = params['charset']
     batch_size = params['batch_size']
     datasets_files = []
-    for tf_file in glob.iglob(params['data_set'] + '/*.tfrecord'):
+    for tf_file in glob.iglob(params['data_set'] + '/*.record'):
         datasets_files.append(tf_file)
     def _input_fn():
         ds = tf.data.TFRecordDataset(datasets_files, buffer_size=256 * 1024 * 1024)
