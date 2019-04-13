@@ -215,7 +215,7 @@ def _crop_py(img, ymin, xmin, ymax,xmax,texts):
     y1 = min(ymax[i],img.shape[0])
     x1 = min(xmax[i],img.shape[1])
     img = img[y0:y1,x0:x1,:]
-    return np.array([img.shape[0],img.shape[1]]),img,np.array(get_str_labels(wide_charset, texts[i]),np.int32)
+    return np.array([img.shape[0],img.shape[1]],np.int32),img,np.array(get_str_labels(wide_charset, texts[i]),np.int32)
 
 
 def tf_input_fn(params, is_training):
