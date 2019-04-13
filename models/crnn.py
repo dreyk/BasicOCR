@@ -260,7 +260,7 @@ def tf_input_fn(params, is_training):
             size,img,label = tf.py_func(
                 _crop_py,
                 [img,ymin, xmin, ymax,xmax,texts],
-                [tf.uint8,tf.int32]
+                [tf.int32,tf.uint8,tf.int32]
             )
             original_h = size[0]
             original_w = size[1]
