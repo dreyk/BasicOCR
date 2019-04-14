@@ -227,6 +227,7 @@ def tf_input_fn(params, is_training):
     datasets_files = []
     for tf_file in glob.iglob(params['data_set'] + '/*.record'):
         datasets_files.append(tf_file)
+    random.shuffle(datasets_files)
     def _input_fn():
         ds = tf.data.TFRecordDataset(datasets_files, buffer_size=256 * 1024 * 1024)
         def _parser(example):
