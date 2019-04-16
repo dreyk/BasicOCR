@@ -146,38 +146,50 @@ def _im2letter_model_fn(features, labels, mode, params=None, config=None):
     outputs = tf.layers.conv2d(
         features, filters=128, kernel_size=[32, 32], strides=3, padding='SAME', activation=tf.nn.relu
     )
+    logging.info('1: {}'.format(outputs))
     outputs = tf.layers.conv2d(
         outputs, filters=128, kernel_size=[7, 7], strides=1, padding='SAME', activation=tf.nn.relu
     )
+    logging.info('2: {}'.format(outputs))
     outputs = tf.layers.conv2d(
         outputs, filters=128, kernel_size=[7, 7], strides=1, padding='SAME', activation=tf.nn.relu
     )
+    logging.info('3: {}'.format(outputs))
     outputs = tf.layers.conv2d(
         outputs, filters=128, kernel_size=[7, 7], strides=1, padding='SAME', activation=tf.nn.relu
     )
+    logging.info('4: {}'.format(outputs))
     outputs = tf.layers.conv2d(
         outputs, filters=128, kernel_size=[7, 7], strides=1, padding='SAME', activation=tf.nn.relu
     )
+    logging.info('5: {}'.format(outputs))
     outputs = tf.layers.conv2d(
         outputs, filters=128, kernel_size=[7, 7], strides=1, padding='SAME', activation=tf.nn.relu
     )
+    logging.info('6: {}'.format(outputs))
     outputs = tf.layers.conv2d(
         outputs, filters=128, kernel_size=[7, 7], strides=1, padding='SAME', activation=tf.nn.relu
     )
+    logging.info('7: {}'.format(outputs))
     outputs = tf.layers.conv2d(
         outputs, filters=128, kernel_size=[7, 7], strides=1, padding='SAME', activation=tf.nn.relu
     )
+    logging.info('8: {}'.format(outputs))
     outputs = tf.layers.conv2d(
         outputs, filters=500, kernel_size=[32, 32], strides=2, padding='SAME', activation=tf.nn.relu
     )
+    logging.info('9: {}'.format(outputs))
     outputs = tf.layers.conv2d(
         outputs, filters=500, kernel_size=[2, 2], strides=1, padding='SAME', activation=tf.nn.relu
     )
+    logging.info('10: {}'.format(outputs))
     y_pred = tf.layers.conv2d(
         outputs, filters=params['num_labels'], kernel_size=[2, 2], strides=1, padding='SAME'
     )
-    logging.info('y_pred: {}'.format(y_pred))
-    y_pred = tf.reshape(y_pred, shape=(params['batch_size'],-1, y_pred.shape[3]))
+    logging.info('y_pred1: {}'.format(y_pred))
+    y_pred = tf.layers.max_pooling2d(y_pred,[y_pred.shape[1],1],1)
+    logging.info('y_pred2: {}'.format(y_pred))
+    y_pred = tf.reshape(y_pred, shape=(params['batch_size'],y_pred.shape[1]*y_pred.shape[2], y_pred.shape[3]))
     y_pred = tf.nn.log_softmax(y_pred)
     y_pred = tf.transpose(y_pred, perm=[1, 0, 2])
     max_char_count = y_pred.get_shape().as_list()[0]
