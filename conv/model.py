@@ -191,7 +191,7 @@ def _im2letter_model_fn(features, labels, mode, params=None, config=None):
     y_pred = tf.layers.max_pooling2d(y_pred,[y_pred.shape[1],1],1)
     logging.info('y_pred2: {}'.format(y_pred))
     y_pred = tf.reshape(y_pred, shape=(params['batch_size'],y_pred.shape[1]*y_pred.shape[2], y_pred.shape[3]))
-    y_pred = tf.nn.log_softmax(y_pred)
+    y_pred = tf.nn.softmax(y_pred)
     y_pred = tf.transpose(y_pred, perm=[1, 0, 2])
     max_char_count = y_pred.get_shape().as_list()[0]
     input_lengths = tf.zeros([params['batch_size']], dtype=tf.int32) + max_char_count
