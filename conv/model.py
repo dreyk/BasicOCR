@@ -117,7 +117,7 @@ def tf_input_fn(params, is_training):
             padw = tf.maximum(0, int(max_width) - nw)
             padh = tf.maximum(0, 32 - nh)
             img = tf.image.pad_to_bounding_box(img, 0, 0, nh + padh, nw + padw)
-            img = tf.cast(img, tf.float32) / 127.5 - 1
+            img = tf.cast(img, tf.float32) / 255.0
             label = tf.cast(label, tf.int32)
             return img, label
 
@@ -146,46 +146,47 @@ def _im2letter_model_fn(features, labels, mode, params=None, config=None):
     outputs = tf.layers.conv2d(
         features, filters=128, kernel_size=[32, 32], strides=3, padding='SAME', activation=tf.nn.relu
     )
+    outputs = tf.layers.batch_normalization(outputs)
     logging.info('1: {}'.format(outputs))
     outputs = tf.layers.conv2d(
         outputs, filters=128, kernel_size=[7, 7], strides=1, padding='SAME', activation=tf.nn.relu
     )
+    outputs = tf.layers.batch_normalization(outputs)
     logging.info('2: {}'.format(outputs))
     outputs = tf.layers.conv2d(
         outputs, filters=128, kernel_size=[7, 7], strides=1, padding='SAME', activation=tf.nn.relu
     )
-    logging.info('3: {}'.format(outputs))
-    outputs = tf.layers.conv2d(
-        outputs, filters=128, kernel_size=[7, 7], strides=1, padding='SAME', activation=tf.nn.relu
-    )
-    logging.info('4: {}'.format(outputs))
-    outputs = tf.layers.conv2d(
-        outputs, filters=128, kernel_size=[7, 7], strides=1, padding='SAME', activation=tf.nn.relu
-    )
+    outputs = tf.layers.batch_normalization(outputs)
     logging.info('5: {}'.format(outputs))
     outputs = tf.layers.conv2d(
         outputs, filters=128, kernel_size=[7, 7], strides=1, padding='SAME', activation=tf.nn.relu
     )
+    outputs = tf.layers.batch_normalization(outputs)
     logging.info('6: {}'.format(outputs))
     outputs = tf.layers.conv2d(
         outputs, filters=128, kernel_size=[7, 7], strides=1, padding='SAME', activation=tf.nn.relu
     )
+    outputs = tf.layers.batch_normalization(outputs)
     logging.info('7: {}'.format(outputs))
     outputs = tf.layers.conv2d(
         outputs, filters=128, kernel_size=[7, 7], strides=1, padding='SAME', activation=tf.nn.relu
     )
+    outputs = tf.layers.batch_normalization(outputs)
     logging.info('8: {}'.format(outputs))
     outputs = tf.layers.conv2d(
-        outputs, filters=500, kernel_size=[32, 32], strides=2, padding='SAME', activation=tf.nn.relu
+        outputs, filters=256, kernel_size=[32, 32], strides=2, padding='SAME', activation=tf.nn.relu
     )
+    outputs = tf.layers.batch_normalization(outputs)
     logging.info('9: {}'.format(outputs))
     outputs = tf.layers.conv2d(
-        outputs, filters=500, kernel_size=[2, 2], strides=1, padding='SAME', activation=tf.nn.relu
+        outputs, filters=256, kernel_size=[2, 2], strides=1, padding='SAME', activation=tf.nn.relu
     )
+    outputs = tf.layers.batch_normalization(outputs)
     logging.info('10: {}'.format(outputs))
     y_pred = tf.layers.conv2d(
         outputs, filters=params['num_labels'], kernel_size=[2, 2], strides=1, padding='SAME'
     )
+    y_pred = tf.layers.batch_normalization(y_pred)
     logging.info('y_pred1: {}'.format(y_pred))
     y_pred = tf.layers.max_pooling2d(y_pred,[y_pred.shape[1],1],1)
     logging.info('y_pred2: {}'.format(y_pred))
