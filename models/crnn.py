@@ -210,10 +210,10 @@ def generated_input_fn(params, is_training):
 
 def _crop_py(img, ymin, xmin, ymax,xmax,texts):
     i = random.randrange(len(ymin))
-    y0 = max(ymin[i],0)
-    x0 = max(xmin[i],0)
-    y1 = min(ymax[i],img.shape[0])
-    x1 = min(xmax[i],img.shape[1])
+    y0 = max(ymin[i]-2,0)
+    x0 = max(xmin[i]-2,0)
+    y1 = min(ymax[i]+2,img.shape[0])
+    x1 = min(xmax[i]+2,img.shape[1])
     img = img[y0:y1,x0:x1,:]
     label = str(texts[i], encoding='UTF-8')
     return np.array([img.shape[0],img.shape[1]],np.int32),img,np.array(get_str_labels(wide_charset, label),np.int32)
@@ -269,9 +269,7 @@ def tf_input_fn(params, is_training):
             img = tf.reshape(img, [original_h, original_w, 3])
             w = tf.maximum(tf.cast(original_w, tf.float32),1.0)
             h = tf.maximum(tf.cast(original_h, tf.float32),1.0)
-            min_ration = 10.0/tf.minimum(w,h)
-            max_ratio = tf.maximum(min_ration,1.0)
-            ratio = tf.random_uniform((),minval=min_ration,maxval=max_ratio,dtype=tf.float32)
+            ratio = tf.random_uniform((),minval=0.5,maxval=1,dtype=tf.float32)
             w = tf.ceil(w*ratio)
             h = tf.ceil(h*ratio)
             img = tf.image.resize_images(img, [tf.cast(h,tf.int32), tf.cast(w,tf.int32)])
