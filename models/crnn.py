@@ -11,6 +11,7 @@ import numpy as np
 import os
 import random
 import math
+import cv2
 
 ENGLISH_CHAR_MAP = [
     '#',
@@ -22,31 +23,36 @@ ENGLISH_CHAR_MAP = [
     '_'
 ]
 
+
 def read_charset():
     charset = {}
     inv_charset = {}
-    for i,v in enumerate(ENGLISH_CHAR_MAP):
+    for i, v in enumerate(ENGLISH_CHAR_MAP):
         charset[i] = v
         inv_charset[v] = i
 
     return charset, inv_charset
 
+
 wide_charset = None
+
 
 def get_str_labels(char_map, v, add_eos=True):
     v = v.strip()
     v = v.lower()
     result = []
     for t in v:
-        if t == '#' or t=='_':
+        if t == '#' or t == '_':
             return [0]
         i = char_map.get(t, -1)
         if i >= 0:
             result.append(i)
         else:
             return [0]
+    if len(result)<1:
+        return [0]
     if add_eos:
-        result.append(len(char_map)-1)
+        result.append(len(char_map) - 1)
     return result
 
 
@@ -109,11 +115,11 @@ def full_generated_input_fn(params, is_training):
             label = get_str_labels(char_map, label)
             image = PIL.Image.open(filename)
             width, height = image.size
-            min_ration = 10.0/float(min(width,height))
-            max_ratio = max(min_ration,1.0)
-            ratio = random.random()*(max_ratio-min_ration)+min_ration
-            width = int(math.ceil(ratio*width))
-            height = int(math.ceil(ratio*height))
+            min_ration = 10.0 / float(min(width, height))
+            max_ratio = max(min_ration, 1.0)
+            ratio = random.random() * (max_ratio - min_ration) + min_ration
+            width = int(math.ceil(ratio * width))
+            height = int(math.ceil(ratio * height))
             image = image.resize((width, height))
             ration_w = max(width / max_width, 1.0)
             ration_h = max(height / 32.0, 1.0)
@@ -177,11 +183,11 @@ def generated_input_fn(params, is_training):
             label = get_str_labels(char_map, label)
             image = PIL.Image.open(filename)
             width, height = image.size
-            min_ration = 6.0/float(min(width,height))
-            max_ratio = max(min_ration,1.0)
-            ratio = random.random()*(max_ratio-min_ration)+min_ration
-            width = int(tf.ceil(ratio*width))
-            height = int(tf.ceil(ratio*height))
+            min_ration = 6.0 / float(min(width, height))
+            max_ratio = max(min_ration, 1.0)
+            ratio = random.random() * (max_ratio - min_ration) + min_ration
+            width = int(tf.ceil(ratio * width))
+            height = int(tf.ceil(ratio * height))
             image = image.resize((width, height))
             ration_w = max(width / max_width, 1.0)
             ration_h = max(height / 32.0, 1.0)
@@ -208,15 +214,50 @@ def generated_input_fn(params, is_training):
 
     return _input_fn
 
-def _crop_py(img, ymin, xmin, ymax,xmax,texts):
+
+def rotate_bound(image, angle):
+    # grab the dimensions of the image and then determine the
+    # center
+    (h, w) = image.shape[:2]
+    (cX, cY) = (w // 2, h // 2)
+
+    # grab the rotation matrix (applying the negative of the
+    # angle to rotate clockwise), then grab the sine and cosine
+    # (i.e., the rotation components of the matrix)
+    M = cv2.getRotationMatrix2D((cX, cY), -angle, 1.0)
+    cos = np.abs(M[0, 0])
+    sin = np.abs(M[0, 1])
+
+    # compute the new bounding dimensions of the image
+    nW = int((h * sin) + (w * cos))
+    nH = int((h * cos) + (w * sin))
+
+    # adjust the rotation matrix to take into account translation
+    M[0, 2] += (nW / 2) - cX
+    M[1, 2] += (nH / 2) - cY
+
+    # perform the actual rotation and return the image
+    return cv2.warpAffine(image, M, (nW, nH))
+
+
+def _crop_py(img, ymin, xmin, ymax, xmax, texts, gxs, gys):
     i = random.randrange(len(ymin))
-    y0 = max(ymin[i]-2,0)
-    x0 = max(xmin[i]-2,0)
-    y1 = min(ymax[i]+2,img.shape[0])
-    x1 = min(xmax[i]+2,img.shape[1])
-    img = img[y0:y1,x0:x1,:]
+    y0 = max(ymin[i] - 2, 0)
+    x0 = max(xmin[i] - 2, 0)
+    y1 = min(ymax[i] + 2, img.shape[0])
+    x1 = min(xmax[i] + 2, img.shape[1])
+    img = img[y0:y1, x0:x1, :]
+    v = np.transpose(np.concatenate([[gxs[i]], [gys[i]]], axis=0))
+    v = cv2.minAreaRect(v)
+    if v[1][0] > v[1][1]:
+        angle = -1 * v[2]
+    else:
+        angle = -1 * (90 + v[2])
+    if angle != 0 and angle != 90 and angle != -90:
+        img = rotate_bound(img, angle)
     label = str(texts[i], encoding='UTF-8')
-    return np.array([img.shape[0],img.shape[1]],np.int32),img,np.array(get_str_labels(wide_charset, label),np.int32)
+    return np.array([img.shape[0], img.shape[1]], np.int32), img, np.array(get_str_labels(wide_charset, label),
+                                                                           np.int32)
 
 
 def tf_input_fn(params, is_training):
@@ -228,8 +269,10 @@ def tf_input_fn(params, is_training):
     for tf_file in glob.iglob(params['data_set'] + '/*.record'):
         datasets_files.append(tf_file)
     random.shuffle(datasets_files)
+
     def _input_fn():
         ds = tf.data.TFRecordDataset(datasets_files, buffer_size=256 * 1024 * 1024)
+
         def _parser(example):
             features = {
                 'image/encoded':
@@ -246,6 +289,22 @@ def tf_input_fn(params, is_training):
                     tf.VarLenFeature(tf.float32),
                 'image/object/bbox/label_text':
                     tf.VarLenFeature(tf.string),
+                'image/object/bbox/x1':
+                    tf.VarLenFeature(tf.float32),
+                'image/object/bbox/x2':
+                    tf.VarLenFeature(tf.float32),
+                'image/object/bbox/x3':
+                    tf.VarLenFeature(tf.float32),
+                'image/object/bbox/x4':
+                    tf.VarLenFeature(tf.float32),
+                'image/object/bbox/y1':
+                    tf.VarLenFeature(tf.float32),
+                'image/object/bbox/y2':
+                    tf.VarLenFeature(tf.float32),
+                'image/object/bbox/y3':
+                    tf.VarLenFeature(tf.float32),
+                'image/object/bbox/y4':
+                    tf.VarLenFeature(tf.float32),
             }
             res = tf.parse_single_example(example, features)
             img = tf.image.decode_jpeg(res['image/encoded'], channels=3)
@@ -254,30 +313,44 @@ def tf_input_fn(params, is_training):
             img = tf.reshape(img, [original_h, original_w, 3])
             original_w = tf.cast(original_w, tf.float32)
             original_h = tf.cast(original_h, tf.float32)
-            ymin = tf.cast(tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/ymin']), tf.float32)*original_h,tf.int32)
-            xmin = tf.cast(tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/xmin']), tf.float32)*original_w,tf.int32)
-            xmax = tf.cast(tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/xmax']), tf.float32)*original_w,tf.int32)
-            ymax = tf.cast(tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/ymax']), tf.float32)*original_h,tf.int32)
-            texts = tf.sparse_tensor_to_dense(res['image/object/bbox/label_text'],default_value='')
-            size,img,label = tf.py_func(
+            ymin = tf.cast(tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/ymin']), tf.float32) * original_h,
+                           tf.int32)
+            xmin = tf.cast(tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/xmin']), tf.float32) * original_w,
+                           tf.int32)
+            xmax = tf.cast(tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/xmax']), tf.float32) * original_w,
+                           tf.int32)
+            ymax = tf.cast(tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/ymax']), tf.float32) * original_h,
+                           tf.int32)
+            texts = tf.sparse_tensor_to_dense(res['image/object/bbox/label_text'], default_value='')
+            x1 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/x1']), tf.float32)
+            x2 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/x2']), tf.float32)
+            x3 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/x3']), tf.float32)
+            x4 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/x4']), tf.float32)
+            y1 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/y1']), tf.float32)
+            y2 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/y2']), tf.float32)
+            y3 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/y3']), tf.float32)
+            y4 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/y4']), tf.float32)
+            gxs = tf.cast(tf.transpose(tf.stack([x1, x2, x3, x4])) * original_w, tf.int32)
+            gys = tf.cast(tf.transpose(tf.stack([y1, y2, y3, y4])) * original_h, tf.int32)
+            size, img, label = tf.py_func(
                 _crop_py,
-                [img,ymin, xmin, ymax,xmax,texts],
-                [tf.int32,tf.uint8,tf.int32]
+                [img, ymin, xmin, ymax, xmax, texts, gxs, gys],
+                [tf.int32, tf.uint8, tf.int32]
             )
             original_h = size[0]
             original_w = size[1]
             img = tf.reshape(img, [original_h, original_w, 3])
-            w = tf.maximum(tf.cast(original_w, tf.float32),1.0)
-            h = tf.maximum(tf.cast(original_h, tf.float32),1.0)
-            ratio = tf.random_uniform((),minval=0.5,maxval=1,dtype=tf.float32)
-            w = tf.ceil(w*ratio)
-            h = tf.ceil(h*ratio)
-            img = tf.image.resize_images(img, [tf.cast(h,tf.int32), tf.cast(w,tf.int32)])
+            w = tf.maximum(tf.cast(original_w, tf.float32), 1.0)
+            h = tf.maximum(tf.cast(original_h, tf.float32), 1.0)
+            ratio = tf.random_uniform((), minval=0.5, maxval=1, dtype=tf.float32)
+            w = tf.ceil(w * ratio)
+            h = tf.ceil(h * ratio)
+            img = tf.image.resize_images(img, [tf.cast(h, tf.int32), tf.cast(w, tf.int32)])
             ratio_w = tf.maximum(w / max_width, 1.0)
             ratio_h = tf.maximum(h / 32.0, 1.0)
             ratio = tf.maximum(ratio_w, ratio_h)
-            nw = tf.cast(tf.maximum(tf.floor_div(w , ratio),1.0), tf.int32)
-            nh = tf.cast(tf.maximum(tf.floor_div(h , ratio),1.0), tf.int32)
+            nw = tf.cast(tf.maximum(tf.floor_div(w, ratio), 1.0), tf.int32)
+            nh = tf.cast(tf.maximum(tf.floor_div(h, ratio), 1.0), tf.int32)
             img = tf.image.resize_images(img, [nh, nw])
             padw = tf.maximum(0, int(max_width) - nw)
             padh = tf.maximum(0, 32 - nh)
@@ -287,8 +360,10 @@ def tf_input_fn(params, is_training):
             return img, label
 
         ds = ds.map(_parser)
-        def _fileter(img,labels):
-            return tf.not_equal(0,tf.reduce_sum(labels))
+
+        def _fileter(img, labels):
+            return tf.not_equal(0, tf.reduce_sum(labels))
+
         ds = ds.filter(_fileter)
         ds = ds.apply(tf.contrib.data.shuffle_and_repeat(1000))
         ds = ds.padded_batch(batch_size, padded_shapes=([32, max_width, 3], [None]))
@@ -517,7 +592,7 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
                                  kernel_initializer=tf.contrib.layers.xavier_initializer())
 
     if params['beam_search_decoder']:
-        decoded, _log_prob = tf.nn.ctc_beam_search_decoder(logits, input_lengths,merge_repeated=False)
+        decoded, _log_prob = tf.nn.ctc_beam_search_decoder(logits, input_lengths, merge_repeated=False)
     else:
         decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths)
 
