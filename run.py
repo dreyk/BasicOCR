@@ -141,6 +141,16 @@ def parse_args():
         default='synth-crop',
         help='Dataset type',
     )
+    parser.add_argument(
+        '--cnn_type',
+        default='plain',
+        help='Cnn type',
+    )
+    parser.add_argument(
+        '--aug',
+        default='',
+        help='aug',
+    )
 
 
     group = parser.add_mutually_exclusive_group(required=True)
@@ -273,6 +283,8 @@ def main():
         'charset':charset,
         'data_set_type':args.data_set_type,
         'max_width':args.max_width,
+        'cnn_type':args.cnn_type,
+        'aug':args.aug,
     }
 
     if not tf.gfile.Exists(checkpoint_dir):

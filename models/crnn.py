@@ -11,6 +11,8 @@ import numpy as np
 import os
 import random
 import math
+from tensorflow.contrib import slim
+from tensorflow.contrib.slim.python.slim.nets import inception_v3
 import cv2
 
 ENGLISH_CHAR_MAP = [
@@ -49,7 +51,7 @@ def get_str_labels(char_map, v, add_eos=True):
             result.append(i)
         else:
             return [0]
-    if len(result)<1:
+    if len(result) < 1:
         return [0]
     if add_eos:
         result.append(len(char_map) - 1)
@@ -240,7 +242,7 @@ def rotate_bound(image, angle):
     return cv2.warpAffine(image, M, (nW, nH))
 
 
-def _crop_py(img, ymin, xmin, ymax, xmax, texts, gxs, gys):
+def _crop_py_and_roate(img, ymin, xmin, ymax, xmax, texts, gxs, gys):
     i = random.randrange(len(ymin))
     y0 = max(ymin[i] - 2, 0)
     x0 = max(xmin[i] - 2, 0)
@@ -259,6 +261,17 @@ def _crop_py(img, ymin, xmin, ymax, xmax, texts, gxs, gys):
     return np.array([img.shape[0], img.shape[1]], np.int32), img, np.array(get_str_labels(wide_charset, label),
                                                                            np.int32)
 
+def _crop_py(img, ymin, xmin, ymax, xmax, texts):
+    i = random.randrange(len(ymin))
+    y0 = max(ymin[i] - 2, 0)
+    x0 = max(xmin[i] - 2, 0)
+    y1 = min(ymax[i] + 2, img.shape[0])
+    x1 = min(xmax[i] + 2, img.shape[1])
+    img = img[y0:y1, x0:x1, :]
+    label = str(texts[i], encoding='UTF-8')
+    return np.array([img.shape[0], img.shape[1]], np.int32), img, np.array(get_str_labels(wide_charset, label),
+                                                                           np.int32)
+
 
 def tf_input_fn(params, is_training):
     max_width = params['max_width']
@@ -269,43 +282,64 @@ def tf_input_fn(params, is_training):
     for tf_file in glob.iglob(params['data_set'] + '/*.record'):
         datasets_files.append(tf_file)
     random.shuffle(datasets_files)
-
+    augs = params['aug'].split(',')
+    rotate = 'rotate' in augs
+    logging.info('Do rotation: {}'.format(rotate))
+    inception = params['cnn_type']=='inception'
     def _input_fn():
         ds = tf.data.TFRecordDataset(datasets_files, buffer_size=256 * 1024 * 1024)
 
         def _parser(example):
-            features = {
-                'image/encoded':
-                    tf.FixedLenFeature((), tf.string, default_value=''),
-                'image/shape':
-                    tf.FixedLenFeature(3, tf.int64),
-                'image/object/bbox/xmin':
-                    tf.VarLenFeature(tf.float32),
-                'image/object/bbox/xmax':
-                    tf.VarLenFeature(tf.float32),
-                'image/object/bbox/ymin':
-                    tf.VarLenFeature(tf.float32),
-                'image/object/bbox/ymax':
-                    tf.VarLenFeature(tf.float32),
-                'image/object/bbox/label_text':
-                    tf.VarLenFeature(tf.string),
-                'image/object/bbox/x1':
-                    tf.VarLenFeature(tf.float32),
-                'image/object/bbox/x2':
-                    tf.VarLenFeature(tf.float32),
-                'image/object/bbox/x3':
-                    tf.VarLenFeature(tf.float32),
-                'image/object/bbox/x4':
-                    tf.VarLenFeature(tf.float32),
-                'image/object/bbox/y1':
-                    tf.VarLenFeature(tf.float32),
-                'image/object/bbox/y2':
-                    tf.VarLenFeature(tf.float32),
-                'image/object/bbox/y3':
-                    tf.VarLenFeature(tf.float32),
-                'image/object/bbox/y4':
-                    tf.VarLenFeature(tf.float32),
-            }
+            if rotate:
+                features = {
+                    'image/encoded':
+                        tf.FixedLenFeature((), tf.string, default_value=''),
+                    'image/shape':
+                        tf.FixedLenFeature(3, tf.int64),
+                    'image/object/bbox/xmin':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/xmax':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/ymin':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/ymax':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/label_text':
+                        tf.VarLenFeature(tf.string),
+                    'image/object/bbox/x1':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/x2':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/x3':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/x4':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/y1':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/y2':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/y3':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/y4':
+                        tf.VarLenFeature(tf.float32),
+                }
+            else:
+                features = {
+                    'image/encoded':
+                        tf.FixedLenFeature((), tf.string, default_value=''),
+                    'image/shape':
+                        tf.FixedLenFeature(3, tf.int64),
+                    'image/object/bbox/xmin':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/xmax':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/ymin':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/ymax':
+                        tf.VarLenFeature(tf.float32),
+                    'image/object/bbox/label_text':
+                        tf.VarLenFeature(tf.string),
+                }
             res = tf.parse_single_example(example, features)
             img = tf.image.decode_jpeg(res['image/encoded'], channels=3)
             original_w = tf.cast(res['image/shape'][1], tf.int32)
@@ -322,21 +356,28 @@ def tf_input_fn(params, is_training):
             ymax = tf.cast(tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/ymax']), tf.float32) * original_h,
                            tf.int32)
             texts = tf.sparse_tensor_to_dense(res['image/object/bbox/label_text'], default_value='')
-            x1 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/x1']), tf.float32)
-            x2 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/x2']), tf.float32)
-            x3 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/x3']), tf.float32)
-            x4 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/x4']), tf.float32)
-            y1 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/y1']), tf.float32)
-            y2 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/y2']), tf.float32)
-            y3 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/y3']), tf.float32)
-            y4 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/y4']), tf.float32)
-            gxs = tf.cast(tf.transpose(tf.stack([x1, x2, x3, x4])) * original_w, tf.int32)
-            gys = tf.cast(tf.transpose(tf.stack([y1, y2, y3, y4])) * original_h, tf.int32)
-            size, img, label = tf.py_func(
-                _crop_py,
-                [img, ymin, xmin, ymax, xmax, texts, gxs, gys],
-                [tf.int32, tf.uint8, tf.int32]
-            )
+            if rotate:
+                x1 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/x1']), tf.float32)
+                x2 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/x2']), tf.float32)
+                x3 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/x3']), tf.float32)
+                x4 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/x4']), tf.float32)
+                y1 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/y1']), tf.float32)
+                y2 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/y2']), tf.float32)
+                y3 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/y3']), tf.float32)
+                y4 = tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/y4']), tf.float32)
+                gxs = tf.cast(tf.transpose(tf.stack([x1, x2, x3, x4])) * original_w, tf.int32)
+                gys = tf.cast(tf.transpose(tf.stack([y1, y2, y3, y4])) * original_h, tf.int32)
+                size, img, label = tf.py_func(
+                    _crop_py_and_roate,
+                    [img, ymin, xmin, ymax, xmax, texts, gxs, gys],
+                    [tf.int32, tf.uint8, tf.int32]
+                )
+            else:
+                size, img, label = tf.py_func(
+                    _crop_py,
+                    [img, ymin, xmin, ymax, xmax, texts],
+                    [tf.int32, tf.uint8, tf.int32]
+                )
             original_h = size[0]
             original_w = size[1]
             img = tf.reshape(img, [original_h, original_w, 3])
@@ -346,17 +387,20 @@ def tf_input_fn(params, is_training):
             w = tf.ceil(w * ratio)
             h = tf.ceil(h * ratio)
             img = tf.image.resize_images(img, [tf.cast(h, tf.int32), tf.cast(w, tf.int32)])
-            ratio_w = tf.maximum(w / max_width, 1.0)
-            ratio_h = tf.maximum(h / 32.0, 1.0)
-            ratio = tf.maximum(ratio_w, ratio_h)
-            nw = tf.cast(tf.maximum(tf.floor_div(w, ratio), 1.0), tf.int32)
-            nh = tf.cast(tf.maximum(tf.floor_div(h, ratio), 1.0), tf.int32)
-            img = tf.image.resize_images(img, [nh, nw])
-            padw = tf.maximum(0, int(max_width) - nw)
-            padh = tf.maximum(0, 32 - nh)
-            img = tf.image.pad_to_bounding_box(img, 0, 0, nh + padh, nw + padw)
-            img = tf.cast(img, tf.float32) / 255.0
-            label = tf.cast(label, tf.int32)
+            if inception:
+                img = tf.image.resize_images(img, [32,max_width])
+            else:
+                ratio_w = tf.maximum(w / max_width, 1.0)
+                ratio_h = tf.maximum(h / 32.0, 1.0)
+                ratio = tf.maximum(ratio_w, ratio_h)
+                nw = tf.cast(tf.maximum(tf.floor_div(w, ratio), 1.0), tf.int32)
+                nh = tf.cast(tf.maximum(tf.floor_div(h, ratio), 1.0), tf.int32)
+                img = tf.image.resize_images(img, [nh, nw])
+                padw = tf.maximum(0, int(max_width) - nw)
+                padh = tf.maximum(0, 32 - nh)
+                img = tf.image.pad_to_bounding_box(img, 0, 0, nh + padh, nw + padw)
+                img = tf.cast(img, tf.float32) / 255.0
+                label = tf.cast(label, tf.int32)
             return img, label
 
         ds = ds.map(_parser)
@@ -505,25 +549,52 @@ def _cudnn_lstm(mode, params, rnn_inputs):
                                       training=(mode == tf.estimator.ModeKeys.TRAIN))
     return rnn_output, rnn_state, new_states
 
+def _inception_v3_arg_scope(is_training=True,
+                            weight_decay=0.00004,
+                            stddev=0.1,
+                            batch_norm_var_collection='moving_vars'):
+    batch_norm_params = {
+        'is_training': is_training,
+        'decay': 0.9997,
+        'epsilon': 0.001,
+        'variables_collections': {
+            'beta': None,
+            'gamma': None,
+            'moving_mean': [batch_norm_var_collection],
+            'moving_variance': [batch_norm_var_collection],
+        }
+    }
+    normalizer_fn = slim.batch_norm
+    with slim.arg_scope(
+            [slim.conv2d, slim.fully_connected],
+            weights_regularizer=slim.l2_regularizer(weight_decay)):
+        with slim.arg_scope(
+                [slim.conv2d],
+                weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
+                activation_fn=tf.nn.relu6,
+                normalizer_fn=normalizer_fn,
+                normalizer_params=batch_norm_params) as sc:
+            return sc
 
-def _crnn_model_fn(features, labels, mode, params=None, config=None):
-    if isinstance(features, dict):
-        features = features['images']
-    max_width = params['max_width']
-    global_step = tf.train.get_or_create_global_step()
-    logging.info("Features {}".format(features.shape))
-    features = tf.reshape(features, [params['batch_size'], 32, max_width, 3])
-    images = tf.transpose(features, [0, 2, 1, 3])
-    logging.info("Images {}".format(images.shape))
-    if (mode == tf.estimator.ModeKeys.TRAIN or
-            mode == tf.estimator.ModeKeys.EVAL):
-        labels = tf.reshape(labels, [params['batch_size'], -1])
-        tf.summary.image('image', features)
-        idx = tf.where(tf.not_equal(labels, 0))
-        sparse_labels = tf.SparseTensor(idx, tf.gather_nd(labels, idx),
-                                        [params['batch_size'], params['max_target_seq_length']])
-        sparse_labels, _ = tf.sparse_fill_empty_rows(sparse_labels, params['num_labels'] - 1)
 
+def _inception(images, params):
+    with slim.arg_scope(_inception_v3_arg_scope(is_training=True)):
+        with slim.arg_scope(
+                [slim.conv2d, slim.fully_connected, slim.batch_norm],
+                trainable=True):
+            with slim.arg_scope(
+                    [slim.batch_norm, slim.dropout], is_training=True):
+                net, _ = inception_v3.inception_v3_base(
+                    images,
+                    scope='InceptionV3',
+                    final_endpoint='Mixed_5d')
+    net = tf.layers.conv2d(inputs=net, filters=512, kernel_size=(1, 1), padding="valid", activation=tf.nn.relu)
+    logging.info("conv7 {}".format(net.shape))
+
+    return tf.reshape(net, [params['batch_size'], -1, 512])
+    return net
+
+def plain_cnn(images,params):
     # 64 / 3 x 3 / 1 / 1
     conv1 = tf.layers.conv2d(inputs=images, filters=64, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
     logging.info("conv1 {}".format(conv1.shape))
@@ -572,7 +643,32 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
     conv7 = tf.layers.conv2d(inputs=pool4, filters=512, kernel_size=(2, 2), padding="valid", activation=tf.nn.relu)
     logging.info("conv7 {}".format(conv7.shape))
 
-    reshaped_cnn_output = tf.reshape(conv7, [params['batch_size'], -1, 512])
+    return tf.reshape(conv7, [params['batch_size'], -1, 512])
+
+
+def _crnn_model_fn(features, labels, mode, params=None, config=None):
+    if isinstance(features, dict):
+        features = features['images']
+    max_width = params['max_width']
+    global_step = tf.train.get_or_create_global_step()
+    logging.info("Features {}".format(features.shape))
+    features = tf.reshape(features, [params['batch_size'], 32, max_width, 3])
+    images = tf.transpose(features, [0, 2, 1, 3])
+    logging.info("Images {}".format(images.shape))
+    if (mode == tf.estimator.ModeKeys.TRAIN or
+            mode == tf.estimator.ModeKeys.EVAL):
+        labels = tf.reshape(labels, [params['batch_size'], -1])
+        tf.summary.image('image', features)
+        idx = tf.where(tf.not_equal(labels, 0))
+        sparse_labels = tf.SparseTensor(idx, tf.gather_nd(labels, idx),
+                                        [params['batch_size'], params['max_target_seq_length']])
+        sparse_labels, _ = tf.sparse_fill_empty_rows(sparse_labels, params['num_labels'] - 1)
+
+    if params['cnn_type']=='inception':
+        reshaped_cnn_output = _inception(images,params)
+    else:
+        reshaped_cnn_output = plain_cnn(images,params)
+
     rnn_inputs = tf.transpose(reshaped_cnn_output, perm=[1, 0, 2])
 
     max_char_count = rnn_inputs.get_shape().as_list()[0]
