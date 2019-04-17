@@ -729,7 +729,7 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
                                  kernel_initializer=tf.contrib.layers.xavier_initializer())
 
     if params['beam_search_decoder']:
-        decoded, _log_prob = tf.nn.ctc_beam_search_decoder(logits, input_lengths, merge_repeated=False)
+        decoded, _log_prob = tf.nn.ctc_beam_search_decoder(logits, input_lengths, merge_repeated=False,top_paths=10)
     else:
         decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths)
 
@@ -771,7 +771,10 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
         train_op = None
     if mode == tf.estimator.ModeKeys.PREDICT:
         #predictions = tf.to_int32(decoded[0])
-        predictions = tf.sparse_to_dense(tf.to_int32(prediction.indices),
+        predictions = {}
+        for i in range(10):
+            prediction = tf.to_int32(decoded[i])
+            predictions['{}'.format(i)] = tf.sparse_to_dense(tf.to_int32(prediction.indices),
                                          tf.to_int32(prediction.dense_shape),
                                          tf.to_int32(prediction.values),
                                          default_value=-1,
