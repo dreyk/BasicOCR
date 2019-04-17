@@ -770,6 +770,7 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
     else:
         train_op = None
     if mode == tf.estimator.ModeKeys.PREDICT:
+        prediction = tf.to_int32(decoded)
         predictions = tf.sparse_to_dense(tf.to_int32(prediction.indices),
                                          tf.to_int32(prediction.dense_shape),
                                          tf.to_int32(prediction.values),
