@@ -594,7 +594,46 @@ def _inception(images, params):
     return tf.reshape(net, [params['batch_size'], -1, 512])
     return net
 
-def plain_cnn(images,params):
+def resnet_block(inputs,filters,strides,is_training):
+    shortcut = inputs
+    inputs = tf.layers.batch_normalization(inputs,training=is_training)
+    inputs = tf.nn.relu(inputs)
+
+    inputs = tf.layers.conv2d(inputs=inputs, filters=filters, kernel_size=3,strides=strides, padding="same")
+    inputs = tf.layers.batch_normalization(inputs,training=is_training)
+    inputs = tf.nn.relu(inputs)
+    inputs = tf.layers.conv2d(inputs=inputs, filters=filters, kernel_size=3,strides=1, padding="same")
+    return tf.concat([inputs,shortcut], 3)
+
+def resnet(images,params,is_training):
+    conv1 = tf.layers.conv2d(inputs=images, filters=64, kernel_size=(3, 3), padding="same")
+    conv1 = tf.layers.batch_normalization(conv1,training=is_training)
+    conv1 = tf.nn.relu(conv1)
+    conv1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
+    logging.info("conv1 {}".format(conv1.shape))
+
+    conv2 = resnet_block(conv1,64,1,is_training)
+    logging.info("conv2 {}".format(conv2.shape))
+    conv3 = resnet_block(conv2,128,1,is_training)
+    conv3 = tf.layers.max_pooling2d(inputs=conv3, pool_size=[2, 2], strides=[1,2])
+    logging.info("conv3 {}".format(conv3.shape))
+    conv4 = resnet_block(conv3,256,1,is_training)
+    conv4 = tf.layers.max_pooling2d(inputs=conv4, pool_size=[2, 2], strides=1)
+    logging.info("conv3 {}".format(conv4.shape))
+    conv5 = resnet_block(conv4,256,1,is_training)
+    conv5 = tf.layers.max_pooling2d(inputs=conv5, pool_size=[2, 2], strides=[1,2])
+    logging.info("conv5 {}".format(conv5.shape))
+    conv6 = resnet_block(conv5,256,1,is_training)
+    conv6 = tf.layers.max_pooling2d(inputs=conv6, pool_size=[2, 2], strides=1)
+    logging.info("conv5 {}".format(conv6.shape))
+    conv7 = resnet_block(conv6,256,1,is_training)
+    conv7 = tf.layers.max_pooling2d(inputs=conv7, pool_size=[2, 2], strides=2)
+    logging.info("conv7 {}".format(conv7.shape))
+
+
+    return tf.reshape(conv7, [params['batch_size'], -1, 1280])
+
+def plain_cnn(images,params,is_training):
     # 64 / 3 x 3 / 1 / 1
     conv1 = tf.layers.conv2d(inputs=images, filters=64, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
     logging.info("conv1 {}".format(conv1.shape))
@@ -615,7 +654,7 @@ def plain_cnn(images,params):
     logging.info("conv3 {}".format(conv3.shape))
 
     # Batch normalization layer
-    bnorm1 = tf.layers.batch_normalization(conv3)
+    bnorm1 = tf.layers.batch_normalization(conv3,training=is_training)
 
     # 256 / 3 x 3 / 1 / 1
     conv4 = tf.layers.conv2d(inputs=bnorm1, filters=256, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
@@ -630,7 +669,7 @@ def plain_cnn(images,params):
     logging.info("conv5 {}".format(conv5.shape))
 
     # Batch normalization layer
-    bnorm2 = tf.layers.batch_normalization(conv5)
+    bnorm2 = tf.layers.batch_normalization(conv5,training=is_training)
 
     # 512 / 3 x 3 / 1 / 1
     conv6 = tf.layers.conv2d(inputs=bnorm2, filters=512, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
@@ -666,8 +705,10 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
 
     if params['cnn_type']=='inception':
         reshaped_cnn_output = _inception(images,params)
+    elif params['cnn_type']=='resnet':
+        reshaped_cnn_output = resnet(images,params,mode == tf.estimator.ModeKeys.TRAIN)
     else:
-        reshaped_cnn_output = plain_cnn(images,params)
+        reshaped_cnn_output = plain_cnn(images,params,mode == tf.estimator.ModeKeys.TRAIN)
 
     rnn_inputs = tf.transpose(reshaped_cnn_output, perm=[1, 0, 2])
 
