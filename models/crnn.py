@@ -17,8 +17,6 @@ ENGLISH_CHAR_MAP = [
     # Alphabet normal
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
     'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-    '0','1','2','3','4','5','6','7','8','9',
-    '-',':','(',')','.',',','/','$',
     "'",
     " ",
     '_'
@@ -41,10 +39,12 @@ def get_str_labels(char_map, v, add_eos=True):
     result = []
     for t in v:
         if t == '#' or t=='_':
-            continue
+            return [0]
         i = char_map.get(t, -1)
         if i >= 0:
             result.append(i)
+        else:
+            return [0]
     if add_eos:
         result.append(len(char_map)-1)
     return result
@@ -194,7 +194,7 @@ def generated_input_fn(params, is_training):
             pw = max(0, max_width - image.shape[1])
             ph = max(0, 32 - image.shape[0])
             image = np.pad(image, ((0, ph), (0, pw), (0, 0)), 'constant', constant_values=0)
-            image = image.astype(np.float32) / 127.5 - 1
+            image = image.astype(np.float32) / 255.0
             return image, np.array(label, dtype=np.int32)
 
         dataset = dataset.map(
@@ -282,11 +282,14 @@ def tf_input_fn(params, is_training):
             padw = tf.maximum(0, int(max_width) - nw)
             padh = tf.maximum(0, 32 - nh)
             img = tf.image.pad_to_bounding_box(img, 0, 0, nh + padh, nw + padw)
-            img = tf.cast(img, tf.float32) / 127.5 - 1
+            img = tf.cast(img, tf.float32) / 255.0
             label = tf.cast(label, tf.int32)
             return img, label
 
         ds = ds.map(_parser)
+        def _fileter(img,labels):
+            return tf.not_equal(0,tf.reduce_sum(labels))
+        ds = ds.filter(_fileter)
         ds = ds.apply(tf.contrib.data.shuffle_and_repeat(1000))
         ds = ds.padded_batch(batch_size, padded_shapes=([32, max_width, 3], [None]))
         return ds
