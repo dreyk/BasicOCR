@@ -14,9 +14,14 @@ import string
 ENGLISH_CHAR_MAP = [
     '#',
     # Alphabet normal
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+    '0','1','2','3','4','5','6','7','8','9',
+    '-',':','(',')','.',',','/'
+    # Apostrophe only for specific cases (eg. : O'clock)
+                            "'",
+    " ",
     # "end of sentence" character for CTC algorithm
-    ' '
     '_'
 ]
 
@@ -67,14 +72,16 @@ def random_string(l=10):
 
 
 def fake_number():
-    if random.randint(0, 10) < 3:
-        return ' ', random_string(random.randint(3, 10))
+    if do_it():
+        v = random_string(random.randint(3, 10))
+        return v.lower(),v
     v = random.randint(1, 100000000)
     n = '{:,}'.format(v)
     if do_it():
         n = n.replace(',', ' , ')
-    if random.randint(0, 10) < 3:
-        return str(v)+' ', n + ' ' + random_string(random.randint(1, 5))
+    if do_it():
+        v = random_string(random.randint(1, 5))
+        return str(v)+' '+v.lower(), n + ' ' + v
     return str(v), n
 
 
@@ -97,12 +104,12 @@ def bluring(img, r):
     return img.filter(ImageFilter.GaussianBlur(r))
 
 
-def box_geerator(text, label, fonts):
+def box_geerator(text, fonts):
     clr = random.randint(0, 100)
     baks_size = random.randint(1, 36)
     f = random.randint(0, len(fonts) - 1)
 
-    if random.randint(0, 10) > 1:
+    if do_it():
         baks_font = ImageFont.truetype(font=fonts[f], size=baks_size)
         baks_width, baks_height = baks_font.getsize('$ ')
     else:
@@ -124,14 +131,8 @@ def box_geerator(text, label, fonts):
     texty = random.randint(0, height - text_height)
     textx = baksx + baks_width + random.randint(0, max(0, width - text_width - baksx - baks_width))
 
-    def _draw_text():
-        txt_draw.text((textx, texty), text, fill=clr, font=text_font)
+    txt_draw.text((textx, texty), text, fill=clr, font=text_font)
 
-    if label == '' or label == ' ':
-        if do_it():
-            _draw_text()
-    else:
-        _draw_text()
     if do_it():
         txt_draw.rectangle([random.randint(0, baksx), random.randint(0, baksy), width - random.randint(0, 10),
                             height - random.randint(0, 10)], outline=0)
@@ -153,7 +154,7 @@ def numbers_input_fn(params, is_training):
                     # text = show_text
                     if j == 0:
                         logging.info("{} / {}".format(text, show_text))
-                    image = box_geerator(show_text, text, fonts)
+                    image = box_geerator(show_text, fonts)
                     image = image.resize((max_width, 32))
                     image = np.asarray(image)
                     image = np.stack([image, image, image], axis=-1)
