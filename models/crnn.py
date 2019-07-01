@@ -119,19 +119,20 @@ def numbers_input_fn(params, is_training):
     max_width = params['max_width']
     char_map = params['charset']
     batch_size = params['batch_size']
-    fonts = glob.glob(params['data_set']+'/*')
+    fonts = glob.glob(params['data_set'] + '/*')
     logging.info('Fonts: {}'.format(fonts))
+
     def _input_fn():
         def _gen():
             for _ in range(params['epoch']):
                 for j in range(1000):
                     text, show_text = fake_number()
-                    if j==0:
-                        logging.info("{}-{}".format(text,show_text))
+                    if j == 0:
+                        logging.info("{}-{}".format(text, show_text))
                     image = box_geerator(show_text, fonts)
-                    image.resize((max_width,32))
+                    image.resize((max_width, 32))
                     image = np.asarray(image)
-                    image = np.stack([image,image,image],axis=-1)
+                    image = np.stack([image, image, image], axis=-1)
                     image = image.astype(np.float32) / 127.5 - 1
                     # logging.info("Text {}".format(data[k,1]))
                     label = get_str_labels(char_map, text)
