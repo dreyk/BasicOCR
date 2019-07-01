@@ -227,6 +227,7 @@ def train(mode, checkpoint_dir, params):
 
 def main():
     checkpoint_dir, args = parse_args()
+    logging.info(os.environ)
     logging.info('------------------')
     logging.info('TF VERSION: {}'.format(tf.__version__))
     logging.info('ARGS: {}'.format(args))
