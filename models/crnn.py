@@ -66,14 +66,14 @@ def random_string(l=10):
 
 
 def fake_number():
-    if random.randint(0, 10) < 2:
+    if random.randint(0, 10) < 3:
         return '', random_string(random.randint(3, 10))
     v = random.randint(1, 100000000)
     n = '{:,}'.format(v)
     if do_it():
         n = n.replace(',', ' , ')
-    if random.randint(0, 10) < 1:
-        str(v), n + ' ' + random_string(random.randint(1, 5))
+    if random.randint(0, 10) < 3:
+        return str(v), n + ' ' + random_string(random.randint(1, 5))
     return str(v), n
 
 
