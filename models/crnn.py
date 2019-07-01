@@ -74,14 +74,14 @@ def random_string(l=10):
 def fake_number():
     if do_it():
         sv = random_string(random.randint(3, 10))
-        return sv.lower(),sv
+        return ' ',sv
     v = random.randint(1, 100000000)
     n = '{:,}'.format(v)
     if do_it():
         n = n.replace(',', ' , ')
     if do_it():
         sv = random_string(random.randint(1, 5))
-        return str(v)+' '+sv.lower(), n + ' ' + sv
+        return str(v), n + ' ' + sv
     return str(v), n
 
 
@@ -159,7 +159,6 @@ def numbers_input_fn(params, is_training):
                     image = np.asarray(image)
                     image = np.stack([image, image, image], axis=-1)
                     image = image.astype(np.float32) / 127.5 - 1
-                    # logging.info("Text {}".format(data[k,1]))
                     label = get_str_labels(char_map, text)
                     yield image, np.array(label, dtype=np.int32)
 
