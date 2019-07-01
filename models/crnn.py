@@ -17,8 +17,6 @@ ENGLISH_CHAR_MAP = [
     '#',
     # Alphabet normal
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-    ','
-    ' '
     # "end of sentence" character for CTC algorithm
     '_'
 ]
@@ -129,7 +127,7 @@ def numbers_input_fn(params, is_training):
             for _ in range(params['epoch']):
                 for j in range(1000):
                     text, show_text = fake_number()
-                    text = show_text
+                    #text = show_text
                     if j == 0:
                         logging.info("{} / {}".format(text, show_text))
                     image = box_geerator(show_text, fonts)
