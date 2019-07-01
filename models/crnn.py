@@ -139,6 +139,7 @@ def numbers_input_fn(params, is_training):
                         w1, h1 = image.size
                         # logging.info("Resize Width: {} Height: {}".format(w1,h1))
                     image = np.asarray(image)
+                    image = np.stack([image,image,image],axis=-1)
                     pw = max(0, max_width - image.shape[1])
                     ph = max(0, 32 - image.shape[0])
                     image = np.pad(image, ((0, ph), (0, pw), (0, 0)), 'constant', constant_values=0)
