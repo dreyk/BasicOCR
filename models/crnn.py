@@ -65,8 +65,6 @@ def random_string(l=10):
     return ''.join(random.choice(letters) for i in range(l))
 
 def fake_number():
-    if random.randint(0, 10) < 1:
-        return '',''
     if random.randint(0, 10) < 2:
         return '',random_string(random.randint(3, 10))
     v = random.randint(1, 100000000)
@@ -123,7 +121,8 @@ def box_geerator(text, fonts):
         txt_draw.text((baksx, baksy), '$ ', fill=clr, font=baks_font)
     texty = random.randint(0, height - text_height)
     textx = baksx + baks_width + random.randint(0, max(0, width - text_width - baksx - baks_width))
-    txt_draw.text((textx, texty), text, fill=clr, font=text_font)
+    if random.randint(0, 10)>1:
+        txt_draw.text((textx, texty), text, fill=clr, font=text_font)
     if do_it():
         txt_draw.rectangle([random.randint(0, baksx), random.randint(0, baksy), width - random.randint(0, 10),
                             height - random.randint(0, 10)], outline=0)
