@@ -95,7 +95,7 @@ def bluring(img, r):
     return img.filter(ImageFilter.GaussianBlur(r))
 
 
-def box_geerator(text, fonts):
+def box_geerator(text,label, fonts):
     clr = random.randint(0, 100)
     baks_size = random.randint(1, 36)
     f = random.randint(0, len(fonts) - 1)
@@ -121,8 +121,13 @@ def box_geerator(text, fonts):
         txt_draw.text((baksx, baksy), '$ ', fill=clr, font=baks_font)
     texty = random.randint(0, height - text_height)
     textx = baksx + baks_width + random.randint(0, max(0, width - text_width - baksx - baks_width))
-    if random.randint(0, 10)>1:
+    def draw_text():
         txt_draw.text((textx, texty), text, fill=clr, font=text_font)
+    if label=='':
+        if do_it():
+            draw_text()
+    else:
+        draw_text()
     if do_it():
         txt_draw.rectangle([random.randint(0, baksx), random.randint(0, baksy), width - random.randint(0, 10),
                             height - random.randint(0, 10)], outline=0)
