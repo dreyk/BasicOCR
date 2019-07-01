@@ -63,7 +63,7 @@ def do_it():
 
 
 def fake_number():
-    v = random.randint(0, 100000000)
+    v = random.randint(1, 100000000)
     n = '{:,}'.format(v)
     if do_it():
         n = n.replace(',', ' , ')
@@ -126,22 +126,12 @@ def numbers_input_fn(params, is_training):
             for _ in range(params['epoch']):
                 for j in range(1000):
                     text, show_text = fake_number()
-                    image = bluring(box_geerator(show_text, fonts),random.randint(0, 1))
-                    width, height = image.size
-                    ration_w = max(width / max_width, 1.0)
-                    ration_h = max(height / 32.0, 1.0)
-                    ratio = max(ration_h, ration_w)
-                    if ratio > 1:
-                        width = int(width / ratio)
-                        height = int(height / ratio)
-                        image = image.resize((width, height))
-                        w1, h1 = image.size
-                        # logging.info("Resize Width: {} Height: {}".format(w1,h1))
+                    if j==0:
+                        logging.info("{}-{}".format(text,show_text))
+                    image = box_geerator(show_text, fonts)
+                    image.resize((max_width,32))
                     image = np.asarray(image)
                     image = np.stack([image,image,image],axis=-1)
-                    pw = max(0, max_width - image.shape[1])
-                    ph = max(0, 32 - image.shape[0])
-                    image = np.pad(image, ((0, ph), (0, pw), (0, 0)), 'constant', constant_values=0)
                     image = image.astype(np.float32) / 127.5 - 1
                     # logging.info("Text {}".format(data[k,1]))
                     label = get_str_labels(char_map, text)
