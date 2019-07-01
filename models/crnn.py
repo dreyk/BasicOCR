@@ -3,15 +3,13 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-import glob
 import logging
 import cv2
-import PIL.Image
 import numpy as np
-import os
 import random
 from PIL import Image, ImageColor, ImageFont, ImageDraw, ImageFilter
 import glob
+import string
 
 ENGLISH_CHAR_MAP = [
     '#',
@@ -62,11 +60,21 @@ def do_it():
     return random.randint(0, 1)
 
 
+def random_string(l=10):
+    letters = string.ascii_letters
+    return ''.join(random.choice(letters) for i in range(l))
+
 def fake_number():
+    if random.randint(0, 10) < 1:
+        return '',''
+    if random.randint(0, 10) < 2:
+        return '',random_string(random.randint(3, 10))
     v = random.randint(1, 100000000)
     n = '{:,}'.format(v)
     if do_it():
         n = n.replace(',', ' , ')
+    if random.randint(0, 10) < 1:
+        str(v), n+' '+random_string(random.randint(1,5))
     return str(v), n
 
 
@@ -93,8 +101,14 @@ def box_geerator(text, fonts):
     clr = random.randint(0, 100)
     baks_size = random.randint(1, 36)
     f = random.randint(0, len(fonts) - 1)
-    baks_font = ImageFont.truetype(font=fonts[f], size=baks_size)
-    baks_width, baks_height = baks_font.getsize('$ ')
+
+    if random.randint(0, 10)>1:
+        baks_font = ImageFont.truetype(font=fonts[f], size=baks_size)
+        baks_width, baks_height = baks_font.getsize('$ ')
+    else:
+        baks_font = None
+        baks_width = 0
+        baks_height = 0
     number_size = random.randint(12, 36)
     text_font = ImageFont.truetype(font=fonts[f], size=number_size)
     text_width, text_height = text_font.getsize(text)
@@ -105,7 +119,8 @@ def box_geerator(text, fonts):
     txt_draw = ImageDraw.Draw(img)
     baksy = random.randint(0, height - baks_height)
     baksx = random.randint(0, width - text_width - baks_width)
-    txt_draw.text((baksx, baksy), '$ ', fill=clr, font=baks_font)
+    if baks_font is not None:
+        txt_draw.text((baksx, baksy), '$ ', fill=clr, font=baks_font)
     texty = random.randint(0, height - text_height)
     textx = baksx + baks_width + random.randint(0, max(0, width - text_width - baksx - baks_width))
     txt_draw.text((textx, texty), text, fill=clr, font=text_font)
