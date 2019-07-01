@@ -128,7 +128,7 @@ def numbers_input_fn(params, is_training):
                 for j in range(1000):
                     text, show_text = fake_number()
                     if j == 0:
-                        logging.info("{}-{}".format(text, show_text))
+                        logging.info("{} / {}".format(text, show_text))
                     image = box_geerator(show_text, fonts)
                     image = image.resize((max_width, 32))
                     image = np.asarray(image)
