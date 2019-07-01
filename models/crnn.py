@@ -257,7 +257,7 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
     if (mode == tf.estimator.ModeKeys.TRAIN or
             mode == tf.estimator.ModeKeys.EVAL):
         labels = tf.reshape(labels, [params['batch_size'], -1])
-        tf.summary.image('image', features)
+        tf.summary.image('image', features,params['batch_size'])
         idx = tf.where(tf.not_equal(labels, 0))
         sparse_labels = tf.SparseTensor(idx, tf.gather_nd(labels, idx),
                                         [params['batch_size'], params['max_target_seq_length']])
