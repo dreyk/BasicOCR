@@ -73,15 +73,15 @@ def random_string(l=10):
 
 def fake_number():
     if do_it():
-        v = random_string(random.randint(3, 10))
-        return v.lower(),v
+        sv = random_string(random.randint(3, 10))
+        return sv.lower(),sv
     v = random.randint(1, 100000000)
     n = '{:,}'.format(v)
     if do_it():
         n = n.replace(',', ' , ')
     if do_it():
-        v = random_string(random.randint(1, 5))
-        return str(v)+' '+v.lower(), n + ' ' + v
+        sv = random_string(random.randint(1, 5))
+        return str(v)+' '+sv.lower(), n + ' ' + sv
     return str(v), n
 
 
