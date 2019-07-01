@@ -130,7 +130,7 @@ def numbers_input_fn(params, is_training):
                     if j == 0:
                         logging.info("{}-{}".format(text, show_text))
                     image = box_geerator(show_text, fonts)
-                    image.resize((max_width, 32))
+                    image = image.resize((max_width, 32))
                     image = np.asarray(image)
                     image = np.stack([image, image, image], axis=-1)
                     image = image.astype(np.float32) / 127.5 - 1
