@@ -16,6 +16,7 @@ ENGLISH_CHAR_MAP = [
     # Alphabet normal
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
     # "end of sentence" character for CTC algorithm
+    ' '
     '_'
 ]
 
@@ -67,13 +68,13 @@ def random_string(l=10):
 
 def fake_number():
     if random.randint(0, 10) < 3:
-        return '', random_string(random.randint(3, 10))
+        return ' ', random_string(random.randint(3, 10))
     v = random.randint(1, 100000000)
     n = '{:,}'.format(v)
     if do_it():
         n = n.replace(',', ' , ')
     if random.randint(0, 10) < 3:
-        return str(v), n + ' ' + random_string(random.randint(1, 5))
+        return str(v)+' ', n + ' ' + random_string(random.randint(1, 5))
     return str(v), n
 
 
@@ -126,7 +127,7 @@ def box_geerator(text, label, fonts):
     def _draw_text():
         txt_draw.text((textx, texty), text, fill=clr, font=text_font)
 
-    if label == '':
+    if label == '' or label == ' ':
         if do_it():
             _draw_text()
     else:
