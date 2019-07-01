@@ -129,6 +129,7 @@ def numbers_input_fn(params, is_training):
             for _ in range(params['epoch']):
                 for j in range(1000):
                     text, show_text = fake_number()
+                    text = show_text
                     if j == 0:
                         logging.info("{} / {}".format(text, show_text))
                     image = box_geerator(show_text, fonts)
