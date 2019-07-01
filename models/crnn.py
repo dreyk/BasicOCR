@@ -126,7 +126,7 @@ def numbers_input_fn(params, is_training):
             for _ in range(params['epoch']):
                 for j in range(1000):
                     text, show_text = fake_number()
-                    image = bluring(box_geerator(show_text, fonts),random.randint(0, 2))
+                    image = bluring(box_geerator(show_text, fonts),random.randint(0, 1))
                     width, height = image.size
                     ration_w = max(width / max_width, 1.0)
                     ration_h = max(height / 32.0, 1.0)
