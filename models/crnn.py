@@ -120,12 +120,13 @@ def numbers_input_fn(params, is_training):
     char_map = params['charset']
     batch_size = params['batch_size']
     fonts = glob.glob(params['data_set']+'/*')
+    logging.info('Fonts: {}'.format(fonts))
     def _input_fn():
         def _gen():
             for _ in range(params['epoch']):
                 for j in range(1000):
                     text, show_text = fake_number()
-                    image = bluring(erode(box_geerator(fake_number(), fonts), random.randint(0, 1)),
+                    image = bluring(erode(box_geerator(show_text, fonts), random.randint(0, 1)),
                                     random.randint(0, 2))
                     width, height = image.size
                     ration_w = max(width / max_width, 1.0)
