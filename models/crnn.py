@@ -64,15 +64,16 @@ def random_string(l=10):
     letters = string.ascii_letters
     return ''.join(random.choice(letters) for i in range(l))
 
+
 def fake_number():
     if random.randint(0, 10) < 2:
-        return '',random_string(random.randint(3, 10))
+        return '', random_string(random.randint(3, 10))
     v = random.randint(1, 100000000)
     n = '{:,}'.format(v)
     if do_it():
         n = n.replace(',', ' , ')
     if random.randint(0, 10) < 1:
-        str(v), n+' '+random_string(random.randint(1,5))
+        str(v), n + ' ' + random_string(random.randint(1, 5))
     return str(v), n
 
 
@@ -95,12 +96,12 @@ def bluring(img, r):
     return img.filter(ImageFilter.GaussianBlur(r))
 
 
-def box_geerator(text,label, fonts):
+def box_geerator(text, label, fonts):
     clr = random.randint(0, 100)
     baks_size = random.randint(1, 36)
     f = random.randint(0, len(fonts) - 1)
 
-    if random.randint(0, 10)>1:
+    if random.randint(0, 10) > 1:
         baks_font = ImageFont.truetype(font=fonts[f], size=baks_size)
         baks_width, baks_height = baks_font.getsize('$ ')
     else:
@@ -121,13 +122,15 @@ def box_geerator(text,label, fonts):
         txt_draw.text((baksx, baksy), '$ ', fill=clr, font=baks_font)
     texty = random.randint(0, height - text_height)
     textx = baksx + baks_width + random.randint(0, max(0, width - text_width - baksx - baks_width))
-    def draw_text():
+
+    def _draw_text():
         txt_draw.text((textx, texty), text, fill=clr, font=text_font)
-    if label=='':
+
+    if label == '':
         if do_it():
-            draw_text()
+            _draw_text()
     else:
-        draw_text()
+        _draw_text()
     if do_it():
         txt_draw.rectangle([random.randint(0, baksx), random.randint(0, baksy), width - random.randint(0, 10),
                             height - random.randint(0, 10)], outline=0)
@@ -146,10 +149,10 @@ def numbers_input_fn(params, is_training):
             for _ in range(params['epoch']):
                 for j in range(1000):
                     text, show_text = fake_number()
-                    #text = show_text
+                    # text = show_text
                     if j == 0:
                         logging.info("{} / {}".format(text, show_text))
-                    image = box_geerator(show_text, fonts)
+                    image = box_geerator(show_text, text, fonts)
                     image = image.resize((max_width, 32))
                     image = np.asarray(image)
                     image = np.stack([image, image, image], axis=-1)
@@ -326,7 +329,7 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
                                  kernel_initializer=tf.contrib.layers.xavier_initializer())
 
     if params['beam_search_decoder']:
-        decoded, _log_prob = tf.nn.ctc_beam_search_decoder(logits, input_lengths,merge_repeated=False)
+        decoded, _log_prob = tf.nn.ctc_beam_search_decoder(logits, input_lengths, merge_repeated=False)
     else:
         decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths)
 
