@@ -16,10 +16,10 @@ ENGLISH_CHAR_MAP = [
     # Alphabet normal
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
     'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-    '0','1','2','3','4','5','6','7','8','9',
-    '-',':','(',')','.',',','/'
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    '-', ':', '(', ')', '.', ',', '/'
     # Apostrophe only for specific cases (eg. : O'clock)
-                            "'",
+                                  "'",
     " ",
     # "end of sentence" character for CTC algorithm
     '_'
@@ -72,16 +72,18 @@ def random_string(l=10):
 
 
 def fake_number():
-    if do_it():
+    if random.randint(1, 10) < 4:
         sv = random_string(random.randint(3, 10))
-        return ' ',sv
+        return sv, sv
     v = random.randint(1, 100000000)
     n = '{:,}'.format(v)
     if do_it():
         n = n.replace(',', ' , ')
     if do_it():
+        n = '$' + n
+    if random.randint(1, 10) < 4:
         sv = random_string(random.randint(1, 5))
-        return str(v), n + ' ' + sv
+        return str(v) + ' ' + sv, n + ' ' + sv
     return str(v), n
 
 
@@ -127,7 +129,7 @@ def box_geerator(text, fonts):
     baksy = random.randint(0, height - baks_height)
     baksx = random.randint(0, width - text_width - baks_width)
     if baks_font is not None:
-        txt_draw.text((baksx, baksy), '$ ', fill=clr, font=baks_font)
+        txt_draw.text((baksx, baksy), '$', fill=clr, font=baks_font)
     texty = random.randint(0, height - text_height)
     textx = baksx + baks_width + random.randint(0, max(0, width - text_width - baksx - baks_width))
 
@@ -256,7 +258,7 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
     if (mode == tf.estimator.ModeKeys.TRAIN or
             mode == tf.estimator.ModeKeys.EVAL):
         labels = tf.reshape(labels, [params['batch_size'], -1])
-        tf.summary.image('image', features,params['batch_size'])
+        tf.summary.image('image', features, params['batch_size'])
         idx = tf.where(tf.not_equal(labels, 0))
         sparse_labels = tf.SparseTensor(idx, tf.gather_nd(labels, idx),
                                         [params['batch_size'], params['max_target_seq_length']])
