@@ -73,7 +73,7 @@ def random_string(l=10):
 
 def fake_number():
     if random.randint(1, 10) < 4:
-        sv = random_string(random.randint(3, 10))
+        sv = random_string(random.randint(1, 10))
         return sv, sv
     v = random.randint(1, 100000000)
     n = '{:,}'.format(v)
