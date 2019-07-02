@@ -126,7 +126,7 @@ def box_geerator(text, fonts):
     width = baks_width + text_width + random.randint(0, int(text_width / 2))
     if do_it():
         img = np.ones((height, width),np.uint8) * 255
-        img = cv2.randn(img, 200, 20)
+        img = cv2.randn(img, 240, 15)
         img = Image.fromarray(img,'L')
     else:
         img = Image.new('L', (width, height), (255))
