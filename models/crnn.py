@@ -92,7 +92,7 @@ def fake_number():
 def corrupt(img):
     width,height = img
     r = 1.0+random.randint(0, 5)/10
-    img = img.resize(int(width*r),int(height*r))
+    img = img.resize(int(width/r),int(height/r))
     return img.resize(width,height)
 
 
