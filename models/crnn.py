@@ -87,23 +87,13 @@ def fake_number():
     return str(v), n
 
 
-def erode(img, k):
-    if k == 0:
-        return img
-    kernel = np.ones((k, k), np.uint8)
-    for y in range(k):
-        for x in range(k):
-            if (x + 1) % 2 == 0 and y % 2 == 0:
-                kernel[y, x] = 0
-
-    img_erosion = cv2.erode(np.array(img), kernel, iterations=2)
-    return Image.fromarray(img_erosion)
 
 
-def bluring(img, r):
-    if r == 0:
-        return img
-    return img.filter(ImageFilter.GaussianBlur(r))
+def corrupt(img):
+    width,height = img
+    r = 1.0+random.randint(0, 5)/10
+    img = img.resize(int(width*r),int(height*r))
+    return img.resize(width,height)
 
 
 def box_geerator(text, fonts):
