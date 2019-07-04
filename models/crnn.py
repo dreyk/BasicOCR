@@ -87,13 +87,11 @@ def fake_number():
     return str(v), n
 
 
-
-
 def corrupt(img):
-    width,height = img
-    r = 1.0+random.randint(0, 5)/10
-    img = img.resize(int(width/r),int(height/r))
-    return img.resize(width,height)
+    width, height = img
+    r = 1.0 + random.randint(0, 5) / 10
+    img = img.resize(int(width / r), int(height / r))
+    return img.resize(width, height)
 
 
 def box_geerator(text, fonts):
@@ -115,9 +113,9 @@ def box_geerator(text, fonts):
     height = height + random.randint(0, height)
     width = baks_width + text_width + random.randint(0, int(text_width / 2))
     if do_it():
-        img = np.ones((height, width),np.uint8) * 255
+        img = np.ones((height, width), np.uint8) * 255
         img = cv2.randn(img, 240, 15)
-        img = Image.fromarray(img,'L')
+        img = Image.fromarray(img, 'L')
     else:
         img = Image.new('L', (width, height), (255))
     txt_draw = ImageDraw.Draw(img)
@@ -326,25 +324,23 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
         logits = tf.layers.dense(rnn_output, params['num_labels'],
                                  kernel_initializer=tf.contrib.layers.xavier_initializer())
 
-
-
-    weights = np.ones([params['num_labels']],np.float32)
+    weights = np.ones([params['num_labels']], np.float32)
     char_map = params['charset']
     weights[char_map['0']] = 1.2
     weights[char_map['1']] = 1.2
-    weights = tf.constant(weights,tf.float32)
-    logits = logits*weights
+    weights = tf.constant(weights, tf.float32)
+    logits = logits * weights
 
     if params['beam_search_decoder']:
-        #logits = logits*weights
+        # logits = logits*weights
         decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, input_lengths, merge_repeated=False)
-        #decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths,merge_repeated=False)
+        # decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths,merge_repeated=False)
 
     else:
         decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths)
 
     prediction = tf.to_int32(decoded[0])
-    log_prob = tf.to_float(log_prob[:,0])
+    log_prob = tf.to_float(log_prob[:, 0])
 
     metrics = {}
     if (mode == tf.estimator.ModeKeys.TRAIN or
@@ -388,7 +384,7 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
                                          name="text")
         export_outputs = {
             tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: tf.estimator.export.PredictOutput(
-                {'text':predictions,'confidence':log_prob})}
+                {'text': predictions, 'confidence': log_prob})}
     else:
         predictions = None
         export_outputs = None
