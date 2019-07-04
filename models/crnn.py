@@ -326,6 +326,15 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
         logits = tf.layers.dense(rnn_output, params['num_labels'],
                                  kernel_initializer=tf.contrib.layers.xavier_initializer())
 
+
+
+    weights = np.ones([params['num_labels']],tf.float32)
+    char_map = params['charset']
+    weights[char_map['0']] = 1.2
+    weights[char_map['1']] = 1.2
+    weights = tf.constant(weights,tf.float32)
+    logits = logits*weights
+
     if params['beam_search_decoder']:
         decoded, _log_prob = tf.nn.ctc_beam_search_decoder(logits, input_lengths, merge_repeated=False)
     else:
