@@ -336,14 +336,15 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
     logits = logits*weights
 
     if params['beam_search_decoder']:
-        logits = logits*weights
-        #decoded, _log_prob = tf.nn.ctc_beam_search_decoder(logits, input_lengths, merge_repeated=False)
-        decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths,merge_repeated=False)
+        #logits = logits*weights
+        decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, input_lengths, merge_repeated=False)
+        #decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths,merge_repeated=False)
 
     else:
-        decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths)
+        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths)
 
     prediction = tf.to_int32(decoded[0])
+    log_prob = tf.to_float(log_prob[:,0])
 
     metrics = {}
     if (mode == tf.estimator.ModeKeys.TRAIN or
@@ -384,10 +385,10 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
                                          tf.to_int32(prediction.dense_shape),
                                          tf.to_int32(prediction.values),
                                          default_value=-1,
-                                         name="output")
+                                         name="text")
         export_outputs = {
             tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: tf.estimator.export.PredictOutput(
-                predictions)}
+                {'text':predictions,'confidence':log_prob})}
     else:
         predictions = None
         export_outputs = None
