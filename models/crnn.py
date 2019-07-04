@@ -328,7 +328,7 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
 
 
 
-    weights = np.ones([params['num_labels']],tf.float32)
+    weights = np.ones([params['num_labels']],np.float32)
     char_map = params['charset']
     weights[char_map['0']] = 1.2
     weights[char_map['1']] = 1.2
