@@ -712,10 +712,12 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
 
     if params['rnn_type'] != 'BasicLSTM':
         rnn_inputs = tf.transpose(reshaped_cnn_output, perm=[1, 0, 2])
+        max_char_count = rnn_inputs.get_shape().as_list()[0]
     else:
         rnn_inputs = reshaped_cnn_output
+        max_char_count = rnn_inputs.get_shape().as_list()[1]
 
-    max_char_count = rnn_inputs.get_shape().as_list()[0]
+
     logging.info("max_char_count {}".format(max_char_count))
     input_lengths = tf.zeros([params['batch_size']], dtype=tf.int32) + max_char_count
     logging.info("InpuLengh {}".format(input_lengths.shape))
