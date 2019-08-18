@@ -498,7 +498,7 @@ def _basic_lstm(mode, params, rnn_inputs):
         # use default for evaluation
         rnn_state = cell.zero_state(params['batch_size'], tf.float32)
     with tf.name_scope('LSTM'):
-        rnn_output, new_states = tf.nn.dynamic_rnn(cell, rnn_inputs, initial_state=rnn_state, time_major=True)
+        rnn_output, new_states = tf.nn.static_rnn(cell, rnn_inputs, initial_state=rnn_state)
     return rnn_output, rnn_state, new_states
 
 
@@ -710,7 +710,8 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
     else:
         reshaped_cnn_output = plain_cnn(images,params,mode == tf.estimator.ModeKeys.TRAIN)
 
-    rnn_inputs = tf.transpose(reshaped_cnn_output, perm=[1, 0, 2])
+    if params['rnn_type'] != 'BasicLSTM':
+        rnn_inputs = tf.transpose(reshaped_cnn_output, perm=[1, 0, 2])
 
     max_char_count = rnn_inputs.get_shape().as_list()[0]
     logging.info("max_char_count {}".format(max_char_count))
@@ -728,10 +729,13 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
         logits = tf.layers.dense(rnn_output, params['num_labels'],
                                  kernel_initializer=tf.contrib.layers.xavier_initializer())
 
+    if params['rnn_type'] == 'BasicLSTM':
+        logits = tf.transpose(logits, perm=[1, 0, 2])
+
     if params['beam_search_decoder']:
         decoded, _log_prob = tf.nn.ctc_beam_search_decoder(logits, input_lengths, merge_repeated=False)
     else:
-        decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths)
+        decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths,merge_repeated=False)
 
     prediction = tf.to_int32(decoded[0])
 
