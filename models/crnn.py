@@ -785,6 +785,7 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
         #                                 tf.to_int32(prediction.values),
         #                                 default_value=-1,
         #                                 name="output")
+        predictions = None
         export_outputs = {
             tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: tf.estimator.export.PredictOutput(
                 logits)}
