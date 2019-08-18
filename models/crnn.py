@@ -498,7 +498,9 @@ def _basic_lstm(mode, params, rnn_inputs):
         # use default for evaluation
         rnn_state = cell.zero_state(params['batch_size'], tf.float32)
     with tf.name_scope('LSTM'):
+        rnn_inputs = tf.unstack(rnn_inputs,axis=1)
         rnn_output, new_states = tf.nn.static_rnn(cell, rnn_inputs, initial_state=rnn_state)
+        rnn_output = tf.stack(rnn_output,axis=1)
     return rnn_output, rnn_state, new_states
 
 
