@@ -795,7 +795,7 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
     return tf.estimator.EstimatorSpec(
         mode=mode,
         eval_metric_ops=metrics,
-        predictions=predictions,
+        predictions=logits,
         loss=loss,
         training_hooks=training_hooks,
         export_outputs=export_outputs,
