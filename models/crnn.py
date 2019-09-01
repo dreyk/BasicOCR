@@ -741,7 +741,8 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
             mode == tf.estimator.ModeKeys.EVAL):
         decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths)
     else:
-        decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths,merge_repeated=False)
+        decoded, _log_prob = tf.nn.ctc_beam_search_decoder(logits, input_lengths, merge_repeated=False)
+        #decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths,merge_repeated=False)
 
     prediction = tf.to_int32(decoded[0])
 
