@@ -737,10 +737,11 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
     if params['rnn_type'] == 'BasicLSTM':
         logits = tf.transpose(logits, perm=[1, 0, 2])
 
-    if params['beam_search_decoder'] and  params['rnn_type'] != 'BasicLSTM':
-        decoded, _log_prob = tf.nn.ctc_beam_search_decoder(logits, input_lengths, merge_repeated=False)
-    else:
+    if (mode == tf.estimator.ModeKeys.TRAIN or
+            mode == tf.estimator.ModeKeys.EVAL):
         decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths)
+    else:
+        decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths,merge_repeated=False)
 
     prediction = tf.to_int32(decoded[0])
 
