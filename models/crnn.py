@@ -258,7 +258,6 @@ def _crop_py_and_roate(img, ymin, xmin, ymax, xmax, texts, gxs, gys):
         img = rotate_bound(img, angle)
     label = str(texts[i], encoding='UTF-8')
     ilabel  = np.array(get_str_labels(wide_charset, label),np.int32)
-    logging.info('use text: {} - {}'.format(label,ilabel))
     return np.array([img.shape[0], img.shape[1]], np.int32), img,ilabel
 
 def _crop_py(img, ymin, xmin, ymax, xmax, texts):
@@ -270,7 +269,6 @@ def _crop_py(img, ymin, xmin, ymax, xmax, texts):
     img = img[y0:y1, x0:x1, :]
     label = str(texts[i], encoding='UTF-8')
     ilabel  = np.array(get_str_labels(wide_charset, label),np.int32)
-    logging.info('use text: {} - {}'.format(label,ilabel))
     return np.array([img.shape[0], img.shape[1]], np.int32), img, ilabel
 
 
