@@ -151,6 +151,12 @@ def parse_args():
         default='',
         help='aug',
     )
+    parser.add_argument(
+        '--lm_model',
+        default='',
+        help='lm_model',
+    )
+
 
 
     group = parser.add_mutually_exclusive_group(required=True)
@@ -285,6 +291,7 @@ def main():
         'max_width':args.max_width,
         'cnn_type':args.cnn_type,
         'aug':args.aug,
+        'lm_model':args.lm_model,
     }
 
     if not tf.gfile.Exists(checkpoint_dir):
