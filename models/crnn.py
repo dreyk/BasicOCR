@@ -513,13 +513,13 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
 
             # Update batch norm stats [http://stackoverflow.com/questions/43234667]
             extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-
+            rnn_vars = tf.get_collection( tf.GraphKeys.TRAINABLE_VARIABLES)
             with tf.control_dependencies(extra_update_ops):
 
                 # Calculate the learning rate given the parameters
                 learning_rate_tensor = tf.train.exponential_decay(
                     params['learning_rate'],
-                    tf.train.get_global_step(),
+                    global_step,
                     params['decay_steps'],
                     params['decay_rate'],
                     staircase=params['decay_staircase'],
@@ -533,7 +533,7 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
                     loss=loss,
                     global_step=global_step,
                     learning_rate=learning_rate_tensor,
-                    optimizer=optimizer)
+                    optimizer=optimizer,variables=rnn_vars)
 
                 tf.summary.scalar('learning_rate', learning_rate_tensor)
     return tf.estimator.EstimatorSpec(
