@@ -526,14 +526,14 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
                     name='learning_rate')
 
                 optimizer = tf.train.AdamOptimizer(
-                    learning_rate=learning_rate_tensor,
-                    beta1=params['momentum'])
+                    learning_rate=params['learning_rate'])
+                train_op = optimizer.minimize(loss, global_step=global_step)
 
-                train_op = tf.contrib.layers.optimize_loss(
-                    loss=loss,
-                    global_step=global_step,
-                    learning_rate=learning_rate_tensor,
-                    optimizer=optimizer,variables=rnn_vars)
+                #train_op = tf.contrib.layers.optimize_loss(
+                #    loss=loss,
+                #    global_step=global_step,
+                #    learning_rate=learning_rate_tensor,
+                #    optimizer=optimizer,variables=rnn_vars)
 
                 tf.summary.scalar('learning_rate', learning_rate_tensor)
     return tf.estimator.EstimatorSpec(
