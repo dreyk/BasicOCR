@@ -187,8 +187,6 @@ def normalize_image( image ):
     return image,scaled_image_width
 
 def tf_input_fn(params, is_training):
-    max_width = params['max_width']
-    global wide_charset
     batch_size = params['batch_size']
     datasets_files = []
     for tf_file in glob.iglob(params['data_set'] + '/*.record'):
