@@ -44,8 +44,26 @@ def parse_args():
     parser.add_argument(
         '--learning_rate',
         type=float,
-        default=2e-4,
+        default=1e-4,
         help='Recommended learning_rate is 2e-4',
+    )
+    parser.add_argument(
+        '--decay_steps',
+        type=float,
+        default=2**16,
+        help='decay_steps',
+    )
+    parser.add_argument(
+        '--decay_rate',
+        type=float,
+        default=0.9,
+        help='decay_rate',
+    )
+    parser.add_argument(
+        '--momentum',
+        type=float,
+        default=0.9,
+        help='momentum',
     )
     parser.add_argument(
         '--num_layers',
@@ -269,6 +287,10 @@ def main():
 
         'batch_size': args.batch_size,
         'learning_rate': args.learning_rate,
+        'decay_steps':args.decay_steps,
+        'decay_rate':args.decay_rate,
+        'decay_staircase':False,
+        'momentum':args.momentum,
         'save_summary_steps': args.save_summary_steps,
         'save_checkpoints_steps': args.save_checkpoints_steps,
         'save_checkpoints_secs': args.save_checkpoints_secs,

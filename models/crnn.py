@@ -5,56 +5,15 @@ from __future__ import print_function
 import tensorflow as tf
 import glob
 import logging
-import pandas as pd
 import PIL.Image
 import numpy as np
-import os
 import random
 import math
-from tensorflow.contrib import slim
-from tensorflow.contrib.slim.python.slim.nets import inception_v3
 import cv2
-
-ENGLISH_CHAR_MAP = [
-    '#',
-    # Alphabet normal
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-    '1', '2', '3', '4', '5', '6', '7', '9', '0',
-    '.', ',', ':', '-', '(', ')', '/', "'",
-    ' ',
-    '_'
-]
+import models.charset as charset
 
 
-def read_charset():
-    charset = {}
-    inv_charset = {}
-    for i, v in enumerate(ENGLISH_CHAR_MAP):
-        charset[i] = v
-        inv_charset[v] = i
 
-    return charset, inv_charset
-
-
-wide_charset = None
-
-
-def get_str_labels(char_map, v, add_eos=True):
-    v = v.strip()
-    v = v.lower()
-    result = []
-    for t in v:
-        if t == '#' or t == '_':
-            continue
-        i = char_map.get(t, -1)
-        if i >= 0:
-            result.append(i)
-    if len(result) < 1:
-        return [0]
-    if add_eos:
-        result.append(len(char_map) - 1)
-    return result
 
 
 def null_dataset():
@@ -63,22 +22,21 @@ def null_dataset():
 
     return _input_fn
 
+def _features(img,width,labels):
+    return {'image':img,'width':width},labels
 
 def get_input_fn(dataset_type):
-    if dataset_type == 'synth-crop':
-        return input_fn
     if dataset_type == 'full-generated':
         return full_generated_input_fn
     if dataset_type == 'tf-record':
         return tf_input_fn
     else:
-        return generated_input_fn
+        return tf_input_fn
 
 
 def full_generated_input_fn(params, is_training):
     logging.info('Use full generated')
     max_width = params['max_width']
-    char_map = params['charset']
     batch_size = params['batch_size']
     inputs = []
     with open(params['data_set'] + '/labels.txt', 'r') as f:
@@ -89,7 +47,7 @@ def full_generated_input_fn(params, is_training):
                 continue
             img_name = params['data_set'] + '/' + ls[0]
             text = ' '.join(ls[1:])
-            label = get_str_labels(char_map, text)
+            label = charset.string_to_label(text)
             if len(label) < 2:
                 continue
             inputs.append([img_name, text])
@@ -113,7 +71,7 @@ def full_generated_input_fn(params, is_training):
         def _decode(filename_label):
             filename = str(filename_label[0], encoding='UTF-8')
             label = str(filename_label[1], encoding='UTF-8')
-            label = get_str_labels(char_map, label)
+            label = charset.string_to_label(label)
             image = PIL.Image.open(filename)
             width, height = image.size
             min_ration = 10.0 / float(min(width, height))
@@ -148,72 +106,6 @@ def full_generated_input_fn(params, is_training):
     return _input_fn
 
 
-def generated_input_fn(params, is_training):
-    max_width = params['max_width']
-    char_map = params['charset']
-    batch_size = params['batch_size']
-    inputs = []
-    for img_file in glob.iglob(params['data_set'] + '/*.jpg'):
-        name = os.path.basename(img_file)
-        names = name.split('_')
-        if len(names) > 1:
-            label = get_str_labels(char_map, names[0])
-            if len(label) < 2:
-                continue
-            inputs.append([img_file, names[0]])
-
-    inputs = sorted(inputs, key=lambda row: row[0])
-    input_size = len(inputs)
-    logging.info('Dataset size {}'.format(input_size))
-
-    def _input_fn():
-        dataset = tf.data.Dataset.from_tensor_slices(inputs)
-        shuffle_size = input_size
-        if is_training:
-            logging.info("Shuffle by %d", shuffle_size)
-            if shuffle_size == 0:
-                shuffle_size = 10
-            dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(shuffle_size))
-
-        def _features_labels(images, labels):
-            return images, labels
-
-        def _decode(filename_label):
-            filename = str(filename_label[0], encoding='UTF-8')
-            label = str(filename_label[1], encoding='UTF-8')
-            label = get_str_labels(char_map, label)
-            image = PIL.Image.open(filename)
-            width, height = image.size
-            min_ration = 6.0 / float(min(width, height))
-            max_ratio = max(min_ration, 1.0)
-            ratio = random.random() * (max_ratio - min_ration) + min_ration
-            width = int(tf.ceil(ratio * width))
-            height = int(tf.ceil(ratio * height))
-            image = image.resize((width, height))
-            ration_w = max(width / max_width, 1.0)
-            ration_h = max(height / 32.0, 1.0)
-            ratio = max(ration_h, ration_w)
-            if ratio > 1:
-                width = int(width / ratio)
-                height = int(height / ratio)
-                image = image.resize((width, height))
-            image = np.asarray(image)
-            pw = max(0, max_width - image.shape[1])
-            ph = max(0, 32 - image.shape[0])
-            image = np.pad(image, ((0, ph), (0, pw), (0, 0)), 'constant', constant_values=0)
-            image = image.astype(np.float32) / 255.0
-            return image, np.array(label, dtype=np.int32)
-
-        dataset = dataset.map(
-            lambda filename_label: tuple(tf.py_func(_decode, [filename_label], [tf.float32, tf.int32])),
-            num_parallel_calls=1)
-
-        dataset = dataset.padded_batch(batch_size, padded_shapes=([32, max_width, 3], [None]))
-        dataset = dataset.map(_features_labels, num_parallel_calls=1)
-        dataset = dataset.prefetch(2)
-        return dataset
-
-    return _input_fn
 
 
 def rotate_bound(image, angle):
@@ -241,7 +133,7 @@ def rotate_bound(image, angle):
     return cv2.warpAffine(image, M, (nW, nH))
 
 
-def _crop_py_and_roate(img, ymin, xmin, ymax, xmax, texts, gxs, gys):
+def _crop_py_and_rotate(img, ymin, xmin, ymax, xmax, texts, gxs, gys):
     i = random.randrange(len(ymin))
     y0 = max(ymin[i] - 2, 0)
     x0 = max(xmin[i] - 2, 0)
@@ -257,7 +149,7 @@ def _crop_py_and_roate(img, ymin, xmin, ymax, xmax, texts, gxs, gys):
     if angle != 0 and angle != 90 and angle != -90:
         img = rotate_bound(img, angle)
     label = str(texts[i], encoding='UTF-8')
-    ilabel = np.array(get_str_labels(wide_charset, label), np.int32)
+    ilabel = np.array(charset.string_to_label(label), np.int32)
     return np.array([img.shape[0], img.shape[1]], np.int32), img, ilabel
 
 
@@ -269,14 +161,34 @@ def _crop_py(img, ymin, xmin, ymax, xmax, texts):
     x1 = min(xmax[i] + 2, img.shape[1])
     img = img[y0:y1, x0:x1, :]
     label = str(texts[i], encoding='UTF-8')
-    ilabel = np.array(get_str_labels(wide_charset, label), np.int32)
+    ilabel = np.array(charset.string_to_label(label), np.int32)
     return np.array([img.shape[0], img.shape[1]], np.int32), img, ilabel
 
+def rescale_image( image ):
+    image = tf.image.convert_image_dtype( image, tf.float32 )
+    image = tf.subtract( image, 0.5 )
+    return image
+
+def normalize_image( image ):
+    image = tf.image.rgb_to_grayscale( image )
+    image = rescale_image( image )
+    image_height = tf.cast(tf.shape(image)[0], tf.float64)
+    image_width = tf.shape(image)[1]
+
+    scaled_image_width = tf.cast(
+        tf.round(
+            tf.multiply(tf.cast(image_width,tf.float64),
+                        tf.divide(32.0,image_height)) ),
+        tf.int32)
+
+    image = tf.image.resize_images(image, [32, scaled_image_width],
+                                   tf.image.ResizeMethod.BICUBIC )
+
+    return image,scaled_image_width
 
 def tf_input_fn(params, is_training):
     max_width = params['max_width']
     global wide_charset
-    wide_charset = params['charset']
     batch_size = params['batch_size']
     datasets_files = []
     for tf_file in glob.iglob(params['data_set'] + '/*.record'):
@@ -285,8 +197,6 @@ def tf_input_fn(params, is_training):
     augs = params['aug'].split(',')
     rotate = 'rotate' in augs
     logging.info('Do rotation: {}'.format(rotate))
-    inception = params['cnn_type'] == 'inception'
-
     def _input_fn():
         ds = tf.data.TFRecordDataset(datasets_files, buffer_size=256 * 1024 * 1024)
 
@@ -346,6 +256,7 @@ def tf_input_fn(params, is_training):
             original_w = tf.cast(res['image/shape'][1], tf.int32)
             original_h = tf.cast(res['image/shape'][0], tf.int32)
             img = tf.reshape(img, [original_h, original_w, 3])
+
             original_w = tf.cast(original_w, tf.float32)
             original_h = tf.cast(original_h, tf.float32)
             ymin = tf.cast(tf.cast(tf.sparse_tensor_to_dense(res['image/object/bbox/ymin']), tf.float32) * original_h,
@@ -369,7 +280,7 @@ def tf_input_fn(params, is_training):
                 gxs = tf.cast(tf.transpose(tf.stack([x1, x2, x3, x4])) * original_w, tf.int32)
                 gys = tf.cast(tf.transpose(tf.stack([y1, y2, y3, y4])) * original_h, tf.int32)
                 size, img, label = tf.py_func(
-                    _crop_py_and_roate,
+                    _crop_py_and_rotate,
                     [img, ymin, xmin, ymax, xmax, texts, gxs, gys],
                     [tf.int32, tf.uint8, tf.int32]
                 )
@@ -382,432 +293,255 @@ def tf_input_fn(params, is_training):
             original_h = size[0]
             original_w = size[1]
             img = tf.reshape(img, [original_h, original_w, 3])
-            w = tf.maximum(tf.cast(original_w, tf.float32), 1.0)
-            h = tf.maximum(tf.cast(original_h, tf.float32), 1.0)
-            ratio = tf.random_uniform((), minval=0.5, maxval=1, dtype=tf.float32)
-            w = tf.ceil(w * ratio)
-            h = tf.ceil(h * ratio)
-            img = tf.image.resize_images(img, [tf.cast(h, tf.int32), tf.cast(w, tf.int32)])
-            if inception:
-                img = tf.image.resize_images(img, [32, max_width])
-            else:
-                ratio_w = tf.maximum(w / max_width, 1.0)
-                ratio_h = tf.maximum(h / 32.0, 1.0)
-                ratio = tf.maximum(ratio_w, ratio_h)
-                nw = tf.cast(tf.maximum(tf.floor_div(w, ratio), 1.0), tf.int32)
-                nh = tf.cast(tf.maximum(tf.floor_div(h, ratio), 1.0), tf.int32)
-                img = tf.image.resize_images(img, [nh, nw])
-                padw = tf.maximum(0, int(max_width) - nw)
-                padh = tf.maximum(0, 32 - nh)
-                img = tf.image.pad_to_bounding_box(img, 0, 0, nh + padh, nw + padw)
-                img = tf.cast(img, tf.float32) / 255.0
-                label = tf.cast(label, tf.int32)
-            return img, label
+            img,inference_w = normalize_image(img)
+            return img,inference_w,label
 
         ds = ds.map(_parser)
 
-        def _fileter(img, labels):
+        def _fileter(_img,_inference_w,labels):
             return tf.not_equal(0, tf.reduce_sum(labels))
 
         ds = ds.filter(_fileter)
         ds = ds.apply(tf.contrib.data.shuffle_and_repeat(1000))
-        ds = ds.padded_batch(batch_size, padded_shapes=([32, max_width, 3], [None]))
+        ds = ds.padded_batch(batch_size, padded_shapes=([32, None,1],tf.TensorShape([]),[None]))
+        ds = ds.map(_features)
         return ds
 
     return _input_fn
 
 
-def input_fn(params, is_training):
-    max_width = params['max_width']
-    char_map = params['charset']
-    labels = pd.read_csv(params['data_set'] + '/labels.csv', converters={'text': str}, na_values=[],
-                         keep_default_na=False)
-    limit = params['limit_train']
-    if limit is None or limit < 1:
-        alldata = labels.iloc[:].values
+
+# Layer params:   Filts K  Padding  Name     BatchNorm?
+layer_params = [ [  64, 3, 'valid', 'conv1', False],
+                 [  64, 3, 'same',  'conv2', True],  # pool
+                 [ 128, 3, 'same',  'conv3', False],
+                 [ 128, 3, 'same',  'conv4', True],  # hpool
+                 [ 256, 3, 'same',  'conv5', False],
+                 [ 256, 3, 'same',  'conv6', True],  # hpool
+                 [ 512, 3, 'same',  'conv7', False],
+                 [ 512, 3, 'same',  'conv8', True] ] # hpool 3
+
+rnn_size = 2**9    # Dimensionality of all RNN elements' hidden layers
+dropout_rate = 0.5 # For RNN layers (currently not used--uncomment below)
+
+def conv_layer( bottom, params, training ):
+    """Build a convolutional layer using entry from layer_params)"""
+
+    batch_norm = params[4] # Boolean
+
+    if batch_norm:
+        activation = None
     else:
-        alldata = labels.iloc[:limit].values
-    batch_size = params['batch_size']
-    count = len(alldata) // batch_size
+        activation = tf.nn.relu
 
-    def _input_fn():
-        def _gen():
-            for _ in range(params['epoch']):
-                data = np.random.permutation(alldata)
-                maxlen = 0
-                for j in range(count):
-                    features = []
-                    labels = []
-                    for i in range(batch_size):
-                        k = j * batch_size + i
-                        image = PIL.Image.open('{}/{}.png'.format(params['data_set'], data[k, 0]))
-                        width, height = image.size
-                        # logging.info("Width: {} Height: {}".format(width,height))
-                        ration_w = max(width / max_width, 1.0)
-                        ration_h = max(height / 32.0, 1.0)
-                        ratio = max(ration_h, ration_w)
-                        if ratio > 1:
-                            width = int(width / ratio)
-                            height = int(height / ratio)
-                            image = image.resize((width, height))
-                            w1, h1 = image.size
-                            # logging.info("Resize Width: {} Height: {}".format(w1,h1))
-                        image = np.asarray(image)
-                        pw = max(0, max_width - image.shape[1])
-                        ph = max(0, 32 - image.shape[0])
-                        image = np.pad(image, ((0, ph), (0, pw), (0, 0)), 'constant', constant_values=0)
-                        image = image.astype(np.float32) / 127.5 - 1
-                        # logging.info("Text {}".format(data[k,1]))
-                        label = get_str_labels(char_map, data[k, 1])
-                        features.append(image)
-                        if len(label) > maxlen:
-                            maxlen = len(label)
-                        labels.append(np.array(label, dtype=np.int32))
-                    for i in range(len(labels)):
-                        l = len(labels[i])
-                        if l < maxlen:
-                            labels[i] = np.pad(labels[i], (0, maxlen - l), 'constant', constant_values=0)
+    kernel_initializer = tf.contrib.layers.variance_scaling_initializer()
+    bias_initializer = tf.constant_initializer( value=0.0 )
 
-                    yield (np.stack(features), np.stack(labels))
+    top = tf.layers.conv2d( bottom,
+                            filters=params[0],
+                            kernel_size=params[1],
+                            padding=params[2],
+                            activation=activation,
+                            kernel_initializer=kernel_initializer,
+                            bias_initializer=bias_initializer,
+                            name=params[3] )
+    if batch_norm:
+        top = norm_layer( top, training, params[3]+'/batch_norm' )
+        top = tf.nn.relu( top, name=params[3]+'/relu' )
 
-        ds = tf.data.Dataset.from_generator(_gen, (tf.float32, tf.int32), (
-            tf.TensorShape([params['batch_size'], 32, max_width, 3]),
-            tf.TensorShape([params['batch_size'], None])))
-        ds = ds.prefetch(4)
-        return ds
-
-    return _input_fn
+    return top
 
 
-def _basic_lstm(mode, params, rnn_inputs):
-    with tf.variable_scope('LSTM'):
-        layers_list = []
-        for _ in range(params['num_layers']):
-            cell = tf.nn.rnn_cell.BasicLSTMCell(params['hidden_size'], state_is_tuple=True)
-            layers_list.append(cell)
-        cell = tf.nn.rnn_cell.MultiRNNCell(layers_list, state_is_tuple=True)
-    if mode == tf.estimator.ModeKeys.TRAIN:
-        # make rnn state for training
-        with tf.variable_scope('Hidden_state'):
-            state_variables = []
-            for state_c, state_h in cell.zero_state(params['batch_size'], tf.float32):
-                state_variables.append(tf.nn.rnn_cell.LSTMStateTuple(
-                    tf.Variable(state_c, trainable=False, collections=[tf.GraphKeys.LOCAL_VARIABLES]),
-                    tf.Variable(state_h, trainable=False, collections=[tf.GraphKeys.LOCAL_VARIABLES])))
-            rnn_state = tuple(state_variables)
-    else:
-        # use default for evaluation
-        rnn_state = cell.zero_state(params['batch_size'], tf.float32)
-    with tf.name_scope('LSTM'):
-        rnn_inputs = tf.unstack(rnn_inputs, axis=1)
-        rnn_output, new_states = tf.nn.static_rnn(cell, rnn_inputs, initial_state=rnn_state)
-        rnn_output = tf.stack(rnn_output, axis=1)
-    return rnn_output, rnn_state, new_states
+def pool_layer( bottom, wpool, padding, name ):
+    """Short function to build a pooling layer with less syntax"""
+    top = tf.layers.max_pooling2d( bottom,
+                                   2,
+                                   [2, wpool],
+                                   padding=padding,
+                                   name=name )
+    return top
 
 
-def _cudnn_lstm_compatible(params, rnn_inputs):
-    if params['lstm_direction_type'] == 'bidirectional':
-        with tf.variable_scope('cudnn_lstm'):
-            single_cell = lambda: tf.contrib.rnn.BasicLSTMCell(params['hidden_size'], forget_bias=0,
-                                                               name="cudnn_compatible_lstm_cell")
-            cells_fw = [single_cell() for _ in range(params['num_layers'])]
-            cells_bw = [single_cell() for _ in range(params['num_layers'])]
-            rnn_state_fw = [cell.zero_state(params['batch_size'], tf.float32) for cell in cells_fw]
-            rnn_state_bw = [cell.zero_state(params['batch_size'], tf.float32) for cell in cells_bw]
-        with tf.variable_scope('cudnn_lstm'):
-            rnn_output, new_state_fw, new_states_bw = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
-                cells_fw,
-                cells_bw,
-                rnn_inputs,
-                initial_states_fw=rnn_state_fw,
-                initial_states_bw=rnn_state_bw,
-                sequence_length=None,
-                time_major=True)
-        return rnn_output, rnn_state_fw + rnn_state_bw, new_state_fw + new_states_bw
-    else:
-        with tf.variable_scope('cudnn_lstm'):
-            single_cell = lambda: tf.contrib.rnn.BasicLSTMCell(params['hidden_size'], forget_bias=0,
-                                                               name="cudnn_compatible_lstm_cell")
-            cells = [single_cell() for _ in range(params['num_layers'])]
-            cell = tf.nn.rnn_cell.MultiRNNCell(cells)
-            rnn_state = cell.zero_state(params['batch_size'], tf.float32)
-        with tf.variable_scope('cudnn_lstm'):
-            rnn_output, new_states = tf.nn.dynamic_rnn(cell, rnn_inputs, sequence_length=None,
-                                                       initial_state=rnn_state, time_major=True)
-        return rnn_output, rnn_state, new_states
+def norm_layer( bottom, training, name):
+    """Short function to build a batch normalization layer with less syntax"""
+    top = tf.layers.batch_normalization( bottom,
+                                         axis=3, # channels last
+                                         training=training,
+                                         name=name )
+    return top
 
 
-def _cudnn_lstm(mode, params, rnn_inputs):
-    with tf.variable_scope('LSTM'):
-        dir = 2 if params['lstm_direction_type'] == 'bidirectional' else 1
-        cell = tf.contrib.cudnn_rnn.CudnnLSTM(params['num_layers'], params['hidden_size'],
-                                              direction=params['lstm_direction_type'],
-                                              dropout=float(params['output_keep_prob']))
-        shape = [params['num_layers'] * dir, params['batch_size'], params['hidden_size']]
-        rnn_state = (
-            tf.Variable(tf.zeros(shape, tf.float32), trainable=False, collections=[tf.GraphKeys.LOCAL_VARIABLES]),
-            tf.Variable(tf.zeros(shape, tf.float32), trainable=False, collections=[tf.GraphKeys.LOCAL_VARIABLES]))
-    with tf.name_scope('LSTM'):
-        rnn_output, new_states = cell(rnn_inputs, initial_state=rnn_state,
-                                      training=(mode == tf.estimator.ModeKeys.TRAIN))
-    return rnn_output, rnn_state, new_states
+def convnet_layers( inputs, widths, mode ):
+    """
+    Build convolutional network layers attached to the given input tensor
+    """
+
+    training = (mode == tf.estimator.ModeKeys.TRAIN)
+
+    # inputs should have shape [ ?, 32, ?, 1 ]
+    with tf.variable_scope( "convnet" ): # h,w
+
+        conv1 = conv_layer( inputs, layer_params[0], training ) # 30,30
+        conv2 = conv_layer( conv1, layer_params[1], training )  # 30,30
+        pool2 = pool_layer( conv2, 2, 'valid', 'pool2' )        # 15,15
+        conv3 = conv_layer( pool2, layer_params[2], training )  # 15,15
+        conv4 = conv_layer( conv3, layer_params[3], training )  # 15,15
+        pool4 = pool_layer( conv4, 1, 'valid', 'pool4' )        # 7,14
+        conv5 = conv_layer( pool4, layer_params[4], training )  # 7,14
+        conv6 = conv_layer( conv5, layer_params[5], training )  # 7,14
+        pool6 = pool_layer( conv6, 1, 'valid', 'pool6')         # 3,13
+        conv7 = conv_layer( pool6, layer_params[6], training )  # 3,13
+        conv8 = conv_layer( conv7, layer_params[7], training )  # 3,13
+        pool8 = tf.layers.max_pooling2d( conv8, [3, 1], [3, 1],
+                                         padding='valid',
+                                         name='pool8' )         # 1,13
+        # squeeze row dim
+        features = tf.squeeze( pool8, axis=1, name='features' )
+
+        sequence_length = get_sequence_lengths( widths )
+
+        # Vectorize
+        sequence_length = tf.reshape( sequence_length, [-1], name='seq_len' )
+
+        return features, sequence_length
 
 
-def _inception_v3_arg_scope(is_training=True,
-                            weight_decay=0.00004,
-                            stddev=0.1,
-                            batch_norm_var_collection='moving_vars'):
-    batch_norm_params = {
-        'is_training': is_training,
-        'decay': 0.9997,
-        'epsilon': 0.001,
-        'variables_collections': {
-            'beta': None,
-            'gamma': None,
-            'moving_mean': [batch_norm_var_collection],
-            'moving_variance': [batch_norm_var_collection],
-        }
-    }
-    normalizer_fn = slim.batch_norm
-    with slim.arg_scope(
-            [slim.conv2d, slim.fully_connected],
-            weights_regularizer=slim.l2_regularizer(weight_decay)):
-        with slim.arg_scope(
-                [slim.conv2d],
-                weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
-                activation_fn=tf.nn.relu6,
-                normalizer_fn=normalizer_fn,
-                normalizer_params=batch_norm_params) as sc:
-            return sc
+def get_sequence_lengths( widths ):
+    """Tensor calculating output sequence length from original image widths"""
+    kernel_sizes = [params[1] for params in layer_params]
+
+    with tf.variable_scope("sequence_length"):
+        conv1_trim = tf.constant( 2 * (kernel_sizes[0] // 2),
+                                  dtype=tf.int32,
+                                  name='conv1_trim' )
+        one = tf.constant( 1, dtype=tf.int32, name='one' )
+        two = tf.constant( 2, dtype=tf.int32, name='two' )
+        after_conv1 = tf.subtract( widths, conv1_trim, name='after_conv1' )
+        after_pool2 = tf.floor_div( after_conv1, two, name='after_pool2' )
+        after_pool4 = tf.subtract( after_pool2, one, name='after_pool4' )
+        after_pool6 = tf.subtract( after_pool4, one, name='after_pool6' )
+        after_pool8 = tf.identity( after_pool6, name='after_pool8' )
+    return after_pool8
 
 
-def _inception(images, params):
-    with slim.arg_scope(_inception_v3_arg_scope(is_training=True)):
-        with slim.arg_scope(
-                [slim.conv2d, slim.fully_connected, slim.batch_norm],
-                trainable=True):
-            with slim.arg_scope(
-                    [slim.batch_norm, slim.dropout], is_training=True):
-                net, _ = inception_v3.inception_v3_base(
-                    images,
-                    scope='InceptionV3',
-                    final_endpoint='Mixed_5d')
-    net = tf.layers.conv2d(inputs=net, filters=512, kernel_size=(1, 1), padding="valid", activation=tf.nn.relu)
-    logging.info("conv7 {}".format(net.shape))
-
-    return tf.reshape(net, [params['batch_size'], -1, 512])
-    return net
+def rnn_layer( bottom_sequence, sequence_length, rnn_size, scope ):
+    """Build bidirectional (concatenated output) RNN layer"""
 
 
-def resnet_block(inputs, filters, strides, is_training):
-    shortcut = inputs
-    inputs = tf.layers.batch_normalization(inputs, training=is_training)
-    inputs = tf.nn.relu(inputs)
+    # Default activation is tanh
+    cell_fw = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell( rnn_size )
+    cell_bw = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(rnn_size )
 
-    inputs = tf.layers.conv2d(inputs=inputs, filters=filters, kernel_size=3, strides=strides, padding="same")
-    inputs = tf.layers.batch_normalization(inputs, training=is_training)
-    inputs = tf.nn.relu(inputs)
-    inputs = tf.layers.conv2d(inputs=inputs, filters=filters, kernel_size=3, strides=1, padding="same")
-    return tf.concat([inputs, shortcut], 3)
+    # Pre-CUDNN (slower) alternatve. Default activation is tanh .
+    #cell_fw = tf.contrib.rnn.LSTMCell( rnn_size,
+    #                                   initializer=weight_initializer)
+    #cell_bw = tf.contrib.rnn.LSTMCell( rnn_size,
+    #                                   initializer=weight_initializer)
 
+    # Include?
+    #cell_fw = tf.contrib.rnn.DropoutWrapper( cell_fw,
+    #                                         input_keep_prob=dropout_rate )
+    #cell_bw = tf.contrib.rnn.DropoutWrapper( cell_bw,
+    #                                         input_keep_prob=dropout_rate )
 
-def resnet(images, params, is_training):
-    conv1 = tf.layers.conv2d(inputs=images, filters=64, kernel_size=(3, 3), padding="same")
-    conv1 = tf.layers.batch_normalization(conv1, training=is_training)
-    conv1 = tf.nn.relu(conv1)
-    conv1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
-    logging.info("conv1 {}".format(conv1.shape))
+    rnn_output,_ = tf.nn.bidirectional_dynamic_rnn(
+        cell_fw,
+        cell_bw,
+        bottom_sequence,
+        sequence_length=sequence_length,
+        time_major=True,
+        dtype=tf.float32,
+        scope=scope )
 
-    conv2 = resnet_block(conv1, 64, 1, is_training)
-    logging.info("conv2 {}".format(conv2.shape))
-    conv3 = resnet_block(conv2, 128, 1, is_training)
-    conv3 = tf.layers.max_pooling2d(inputs=conv3, pool_size=[2, 2], strides=[1, 2])
-    logging.info("conv3 {}".format(conv3.shape))
-    conv4 = resnet_block(conv3, 256, 1, is_training)
-    conv4 = tf.layers.max_pooling2d(inputs=conv4, pool_size=[2, 2], strides=1)
-    logging.info("conv3 {}".format(conv4.shape))
-    conv5 = resnet_block(conv4, 256, 1, is_training)
-    conv5 = tf.layers.max_pooling2d(inputs=conv5, pool_size=[2, 2], strides=[1, 2])
-    logging.info("conv5 {}".format(conv5.shape))
-    conv6 = resnet_block(conv5, 256, 1, is_training)
-    conv6 = tf.layers.max_pooling2d(inputs=conv6, pool_size=[2, 2], strides=1)
-    logging.info("conv5 {}".format(conv6.shape))
-    conv7 = resnet_block(conv6, 256, 1, is_training)
-    conv7 = tf.layers.max_pooling2d(inputs=conv7, pool_size=[2, 2], strides=2)
-    logging.info("conv7 {}".format(conv7.shape))
+    # Concatenation allows a single output op because [A B]*[x;y] = Ax+By
+    # [ paddedSeqLen batchSize 2*rnn_size]
+    rnn_output_stack = tf.concat( rnn_output, 2, name='output_stack' )
 
-    return tf.reshape(conv7, [params['batch_size'], -1, 1280])
+    return rnn_output_stack
 
 
-def plain_cnn(images, params, is_training):
-    # 64 / 3 x 3 / 1 / 1
-    conv1 = tf.layers.conv2d(inputs=images, filters=64, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
-    logging.info("conv1 {}".format(conv1.shape))
+def rnn_layers( features, sequence_length, num_classes ):
+    """Build a stack of RNN layers from input features"""
 
-    # 2 x 2 / 1
-    pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
-    logging.info("pool1 {}".format(pool1.shape))
+    # Input features is [batchSize paddedSeqLen numFeatures]
+    logit_activation = tf.nn.relu
+    weight_initializer = tf.contrib.layers.variance_scaling_initializer()
+    bias_initializer = tf.constant_initializer( value=0.0 )
 
-    # 128 / 3 x 3 / 1 / 1
-    conv2 = tf.layers.conv2d(inputs=pool1, filters=128, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
-    logging.info("conv2 {}".format(conv2.shape))
-    # 2 x 2 / 1
-    pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2)
-    logging.info("pool2 {}".format(pool2.shape))
-
-    # 256 / 3 x 3 / 1 / 1
-    conv3 = tf.layers.conv2d(inputs=pool2, filters=256, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
-    logging.info("conv3 {}".format(conv3.shape))
-
-    # Batch normalization layer
-    bnorm1 = tf.layers.batch_normalization(conv3, training=is_training)
-
-    # 256 / 3 x 3 / 1 / 1
-    conv4 = tf.layers.conv2d(inputs=bnorm1, filters=256, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
-    logging.info("conv4 {}".format(conv4.shape))
-
-    # 1 x 2 / 1
-    pool3 = tf.layers.max_pooling2d(inputs=conv4, pool_size=[2, 2], strides=[1, 2], padding="same")
-    logging.info("pool3 {}".format(pool3.shape))
-
-    # 512 / 3 x 3 / 1 / 1
-    conv5 = tf.layers.conv2d(inputs=pool3, filters=512, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
-    logging.info("conv5 {}".format(conv5.shape))
-
-    # Batch normalization layer
-    bnorm2 = tf.layers.batch_normalization(conv5, training=is_training)
-
-    # 512 / 3 x 3 / 1 / 1
-    conv6 = tf.layers.conv2d(inputs=bnorm2, filters=512, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
-    logging.info("conv6 {}".format(conv6.shape))
-
-    # 1 x 2 / 2
-    pool4 = tf.layers.max_pooling2d(inputs=conv6, pool_size=[2, 2], strides=[1, 2], padding="same")
-    logging.info("pool4 {}".format(pool4.shape))
-    # 512 / 2 x 2 / 1 / 0
-    conv7 = tf.layers.conv2d(inputs=pool4, filters=512, kernel_size=(2, 2), padding="valid", activation=tf.nn.relu)
-    logging.info("conv7 {}".format(conv7.shape))
-
-    return tf.reshape(conv7, [params['batch_size'], -1, 512])
-
+    with tf.variable_scope( "rnn" ):
+        # Transpose to time-major order for efficiency
+        rnn_sequence = tf.transpose( features,
+                                     perm=[1, 0, 2],
+                                     name='time_major' )
+        rnn1 = rnn_layer( rnn_sequence, sequence_length, rnn_size, 'bdrnn1' )
+        rnn2 = rnn_layer( rnn1, sequence_length, rnn_size, 'bdrnn2' )
+        rnn_logits = tf.layers.dense( rnn2,
+                                      num_classes+1,
+                                      activation=logit_activation,
+                                      kernel_initializer=weight_initializer,
+                                      bias_initializer=bias_initializer,
+                                      name='logits' )
+        return rnn_logits
 
 def _crnn_model_fn(features, labels, mode, params=None, config=None):
-    if isinstance(features, dict):
-        features = features['images']
-    max_width = params['max_width']
+    image = features['image']
+    width = features['width']
     global_step = tf.train.get_or_create_global_step()
-    logging.info("Features {}".format(features.shape))
-    features = tf.reshape(features, [params['batch_size'], 32, max_width, 3])
-    images = tf.transpose(features, [0, 2, 1, 3])
-    logging.info("Images {}".format(images.shape))
-    if (mode == tf.estimator.ModeKeys.TRAIN or
-            mode == tf.estimator.ModeKeys.EVAL):
-        labels = tf.reshape(labels, [params['batch_size'], -1])
-        tf.summary.image('image', features)
-        idx = tf.where(tf.not_equal(labels, 0))
-        sparse_labels = tf.SparseTensor(idx, tf.gather_nd(labels, idx),
-                                        [params['batch_size'], params['max_target_seq_length']])
-        sparse_labels, _ = tf.sparse_fill_empty_rows(sparse_labels, params['num_labels'] - 1)
-
-    if params['cnn_type'] == 'inception':
-        reshaped_cnn_output = _inception(images, params)
-    elif params['cnn_type'] == 'resnet':
-        reshaped_cnn_output = resnet(images, params, mode == tf.estimator.ModeKeys.TRAIN)
-    else:
-        reshaped_cnn_output = plain_cnn(images, params, mode == tf.estimator.ModeKeys.TRAIN)
-
-    if params['rnn_type'] != 'BasicLSTM':
-        rnn_inputs = tf.transpose(reshaped_cnn_output, perm=[1, 0, 2])
-        max_char_count = rnn_inputs.get_shape().as_list()[0]
-    else:
-        rnn_inputs = reshaped_cnn_output
-        max_char_count = rnn_inputs.get_shape().as_list()[1]
-
-    logging.info("max_char_count {}".format(max_char_count))
-    input_lengths = tf.zeros([params['batch_size']], dtype=tf.int32) + max_char_count
-    logging.info("InpuLengh {}".format(input_lengths.shape))
-
-    if params['rnn_type'] == 'CudnnLSTM':
-        rnn_output, rnn_state, new_states = _cudnn_lstm(mode, params, rnn_inputs)
-    elif params['rnn_type'] == 'CudnnCompatibleLSTM':
-        rnn_output, rnn_state, new_states = _cudnn_lstm_compatible(params, rnn_inputs)
-    else:
-        rnn_output, rnn_state, new_states = _basic_lstm(mode, params, rnn_inputs)
-
-    with tf.variable_scope('Output_layer'):
-        logits = tf.layers.dense(rnn_output, params['num_labels'],
-                                 kernel_initializer=tf.contrib.layers.xavier_initializer())
-
-    if params['rnn_type'] == 'BasicLSTM':
-        logits = tf.transpose(logits, perm=[1, 0, 2])
-
-    if (mode == tf.estimator.ModeKeys.TRAIN or
-            mode == tf.estimator.ModeKeys.EVAL):
-        decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths)
-    else:
-        decoded, _log_prob = tf.nn.ctc_beam_search_decoder(logits, input_lengths, merge_repeated=False)
-        # decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, input_lengths,merge_repeated=False)
-
-    prediction = tf.to_int32(decoded[0])
-
-    metrics = {}
-    if (mode == tf.estimator.ModeKeys.TRAIN or
-            mode == tf.estimator.ModeKeys.EVAL):
-        levenshtein = tf.edit_distance(prediction, sparse_labels, normalize=True)
-        errors_rate = tf.metrics.mean(levenshtein)
-        mean_error_rate = tf.reduce_mean(levenshtein)
-        metrics['Error_Rate'] = errors_rate
-        if mode == tf.estimator.ModeKeys.TRAIN:
-            tf.summary.scalar('Error_Rate', mean_error_rate)
-        with tf.name_scope('CTC'):
-            ctc_loss = tf.nn.ctc_loss(sparse_labels, logits, input_lengths, ignore_longer_outputs_than_inputs=True)
-            mean_loss = tf.reduce_mean(tf.truediv(ctc_loss, tf.to_float(input_lengths)))
-            loss = mean_loss
-    else:
-        loss = None
-
-    training_hooks = []
-
+    conv_features,sequence_length = convnet_layers( image,width,mode )
+    logits = rnn_layers( conv_features, sequence_length,charset.num_classes() )
+    predictions = None
+    export_outputs = None
     if mode == tf.estimator.ModeKeys.TRAIN:
+        idx = tf.where(tf.not_equal(labels,charset))
+        maxl = tf.cast(tf.reduce_max(idx,axis=0),tf.int64) + 1
+        sparse_labels = tf.SparseTensor(idx, tf.gather_nd(labels, idx),
+                                    [params['batch_size'], maxl])
+        labels, _ = tf.sparse_fill_empty_rows(sparse_labels,charset.num_classes()+1)
+        with tf.name_scope( "train" ):
+            losses = tf.nn.ctc_loss( labels,
+                                     logits,
+                                     sequence_length,
+                                     time_major=True,
+                                     ignore_longer_outputs_than_inputs=True )
+            decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, sequence_length)
+            loss = tf.reduce_mean( losses )
+            prediction = tf.to_int32(decoded[0])
+            levenshtein = tf.edit_distance(prediction, labels, normalize=True)
+            mean_error_rate = tf.reduce_mean(levenshtein)
+            tf.summary.scalar('Error_Rate', mean_error_rate)
 
-        opt = tf.train.AdamOptimizer(params['learning_rate'])
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        with tf.control_dependencies(update_ops):
-            if params['grad_clip'] is None:
-                train_op = opt.minimize(loss, global_step=global_step)
-            else:
-                gradients, variables = zip(*opt.compute_gradients(loss))
-                gradients, _ = tf.clip_by_global_norm(gradients, params['grad_clip'])
-                train_op = opt.apply_gradients([(gradients[i], v) for i, v in enumerate(variables)],
-                                               global_step=global_step)
-    elif mode == tf.estimator.ModeKeys.EVAL:
-        train_op = None
-    else:
-        train_op = None
-    if mode == tf.estimator.ModeKeys.PREDICT:
-        if (params['lm_model'] == 'export'):
-            predictions = logits
-        else:
-            predictions = tf.sparse_to_dense(tf.to_int32(prediction.indices),
-                                             tf.to_int32(prediction.dense_shape),
-                                             tf.to_int32(prediction.values),
-                                             default_value=-1,
-                                             name="output")
-        export_outputs = {
-            tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: tf.estimator.export.PredictOutput(
-                predictions)}
-    else:
-        predictions = None
-        export_outputs = None
+            # Update batch norm stats [http://stackoverflow.com/questions/43234667]
+            extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+
+            with tf.control_dependencies(extra_update_ops):
+
+                # Calculate the learning rate given the parameters
+                learning_rate_tensor = tf.train.exponential_decay(
+                    params['learning_rate'],
+                    tf.train.get_global_step(),
+                    params['decay_steps'],
+                    params['decay_rate'],
+                    staircase=params['decay_staircase'],
+                    name='learning_rate')
+
+                optimizer = tf.train.AdamOptimizer(
+                    learning_rate=learning_rate_tensor,
+                    beta1=params['momentum'])
+
+                train_op = tf.contrib.layers.optimize_loss(
+                    loss=loss,
+                    global_step=global_step,
+                    learning_rate=learning_rate_tensor,
+                    optimizer=optimizer)
+
+                tf.summary.scalar('learning_rate', learning_rate_tensor)
     return tf.estimator.EstimatorSpec(
         mode=mode,
-        eval_metric_ops=metrics,
         predictions=predictions,
         loss=loss,
-        training_hooks=training_hooks,
+        training_hooks=[],
         export_outputs=export_outputs,
         train_op=train_op)
-
 
 class BaseOCR(tf.estimator.Estimator):
     def __init__(
