@@ -56,4 +56,6 @@ def string_to_label ( string ):
         if i < 0:
             return [0]
         label.append(i)
+    if len(label)>0:
+        label.append(num_classes()+1)
     return label
