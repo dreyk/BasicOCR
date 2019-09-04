@@ -296,8 +296,8 @@ def tf_input_fn(params, is_training):
 
         ds = ds.map(_parser)
 
-        def _fileter(_img,_inference_w,labels):
-            return tf.not_equal(0, tf.reduce_sum(labels))
+        def _fileter(_img,inference_w,labels):
+            return tf.logical_and(tf.not_equal(0, tf.reduce_sum(labels),tf.greater(inference_w,12)))
 
         ds = ds.filter(_fileter)
         ds = ds.apply(tf.contrib.data.shuffle_and_repeat(1000))
