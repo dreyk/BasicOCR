@@ -493,9 +493,9 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
     if mode == tf.estimator.ModeKeys.TRAIN:
         eos = charset.num_classes()+1
         idx = tf.where(tf.not_equal(labels,eos))
-        maxl = tf.cast(tf.reduce_max(idx,axis=0),tf.int64) + 1
+        use_shape = tf.cast(tf.reduce_max(idx,axis=0),tf.int64) + 1
         sparse_labels = tf.SparseTensor(idx, tf.gather_nd(labels, idx),
-                                    [params['batch_size'], maxl])
+                                        use_shape)
         labels, _ = tf.sparse_fill_empty_rows(sparse_labels,eos)
         with tf.name_scope( "train" ):
             tf.summary.image('image', image)
