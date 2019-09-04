@@ -301,7 +301,7 @@ def tf_input_fn(params, is_training):
 
         ds = ds.filter(_fileter)
         ds = ds.apply(tf.contrib.data.shuffle_and_repeat(1000))
-        ds = ds.padded_batch(batch_size, padded_shapes=([32, None,1],tf.TensorShape([]),[None]),padding_values=(0,0,charset.num_classes()+1))
+        ds = ds.padded_batch(batch_size, padded_shapes=([32, None,1],tf.TensorShape([]),[None]),padding_values=(0.0,0,charset.num_classes()+1))
         ds = ds.map(_features)
         return ds
 
