@@ -54,8 +54,10 @@ def string_to_label ( string ):
     for c in string:
         i = out_charset_dict.get(c,-1)
         if i < 0:
-            return [0]
+            continue
         label.append(i)
     if len(label)>0:
         label.append(num_classes()+1)
+    else:
+        return [0]
     return label
