@@ -521,11 +521,11 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
             extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
             rnn_vars = tf.get_collection( tf.GraphKeys.TRAINABLE_VARIABLES)
 
-            print_op = tf.print('input_width:',width,
-                                'sequence_length:',sequence_length,
-                                'labels',labels,
-                                output_stream=sys.stdout)
-            extra_update_ops.append(print_op)
+            #print_op = tf.print('input_width:',width,
+            #                    'sequence_length:',sequence_length,
+            #                    'labels',labels,
+            #                    output_stream=sys.stdout)
+            #extra_update_ops.append(print_op)
             with tf.control_dependencies(extra_update_ops):
 
                 # Calculate the learning rate given the parameters
