@@ -307,7 +307,7 @@ def main():
         'num_layers':args.num_layers,
         'output_keep_prob':args.output_keep_prob,
         'lstm_direction_type':args.lstm_direction_type,
-        'charset':charset,
+        'charset':None,
         'data_set_type':args.data_set_type,
         'max_width':args.max_width,
         'cnn_type':args.cnn_type,
