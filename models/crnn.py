@@ -496,6 +496,7 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
                                     [params['batch_size'], maxl])
         labels, _ = tf.sparse_fill_empty_rows(sparse_labels,charset.num_classes()+1)
         with tf.name_scope( "train" ):
+            tf.summary.image('image', image)
             losses = tf.nn.ctc_loss( labels,
                                      logits,
                                      sequence_length,
