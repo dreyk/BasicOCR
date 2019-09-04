@@ -12,7 +12,7 @@ import math
 import cv2
 import models.charset as charset
 
-
+import sys
 
 
 
@@ -484,22 +484,28 @@ def rnn_layers( features, sequence_length, num_classes ):
 
 def _crnn_model_fn(features, labels, mode, params=None, config=None):
     image = features['image']
+    logging.info('image: {}'.format(image.shape))
     width = features['width']
+    logging.info('width: {}'.format(width.shape))
     global_step = tf.train.get_or_create_global_step()
     conv_features,sequence_length = convnet_layers( image,width,mode )
+    logging.info('conv_features: {}'.format(conv_features.shape))
+    logging.info('sequence_length: {}'.format(sequence_length.shape))
     logits = rnn_layers( conv_features, sequence_length,charset.num_classes() )
+    logging.info('logits: {}'.format(logits.shape))
     predictions = None
     export_outputs = None
     if mode == tf.estimator.ModeKeys.TRAIN:
         eos = charset.num_classes()+1
         idx = tf.where(tf.not_equal(labels,eos))
         use_shape = tf.cast(tf.reduce_max(idx,axis=0),tf.int64) + 1
+        logging.info('Use shape: {}'.format(use_shape))
         sparse_labels = tf.SparseTensor(idx, tf.gather_nd(labels, idx),
                                         use_shape)
-        labels, _ = tf.sparse_fill_empty_rows(sparse_labels,eos)
+        slabels, _ = tf.sparse_fill_empty_rows(sparse_labels,eos)
         with tf.name_scope( "train" ):
             tf.summary.image('image', image)
-            losses = tf.nn.ctc_loss( labels,
+            losses = tf.nn.ctc_loss( slabels,
                                      logits,
                                      sequence_length,
                                      time_major=True,
@@ -507,13 +513,19 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
             decoded, _log_prob = tf.nn.ctc_greedy_decoder(logits, sequence_length)
             loss = tf.reduce_mean( losses )
             prediction = tf.to_int32(decoded[0])
-            levenshtein = tf.edit_distance(prediction, labels, normalize=True)
+            levenshtein = tf.edit_distance(prediction, slabels, normalize=True)
             mean_error_rate = tf.reduce_mean(levenshtein)
             tf.summary.scalar('Error_Rate', mean_error_rate)
 
             # Update batch norm stats [http://stackoverflow.com/questions/43234667]
             extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
             rnn_vars = tf.get_collection( tf.GraphKeys.TRAINABLE_VARIABLES)
+
+            print_op = tf.print('input_width:',width,
+                                'sequence_length:',sequence_length,
+                                'labels',labels,
+                                output_stream=sys.stdout)
+            extra_update_ops.append(print_op)
             with tf.control_dependencies(extra_update_ops):
 
                 # Calculate the learning rate given the parameters
