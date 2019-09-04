@@ -11,6 +11,7 @@ import models.charset as charset
 
 mlboard = client.Client()
 
+#python run.py --worker --batch_size 32 --lstm_direction_type unidirectional --num_layers 4 --rnn_type BasicLSTM --hidden_size 256 --data_set $PIXELS_DIR/train --epoch 100 --data_set_type tf-record --max_width 320 --checkpoint_dir $TRAINING_DIR/$BUILD_ID
 
 def parse_args():
     conf_parser = argparse.ArgumentParser(
