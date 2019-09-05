@@ -209,7 +209,8 @@ def export(checkpoint_dir,params):
         model_dir=checkpoint_dir,
     )
     feature_placeholders = {
-        'images': tf.placeholder(tf.float32, [params['batch_size'],32,params['max_width'],3], name='images'),
+        'image': tf.placeholder(tf.float32, [params['batch_size'],32,None,1], name='image'),
+        'width': tf.placeholder(tf.int32, [params['batch_size']], name='width'),
     }
     receiver = tf.estimator.export.build_raw_serving_input_receiver_fn(feature_placeholders,default_batch_size=params['batch_size'])
     net = crnn.BaseOCR(
