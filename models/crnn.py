@@ -549,6 +549,8 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
 
                 tf.summary.scalar('learning_rate', learning_rate_tensor)
     else:
+        loss = None
+        train_op = None
         decoded, _log_prob = tf.nn.ctc_beam_search_decoder(logits, sequence_length, merge_repeated=False)
         prediction = tf.to_int32(decoded[0])
         predictions = tf.sparse_to_dense(tf.to_int32(prediction.indices),
