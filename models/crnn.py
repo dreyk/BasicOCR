@@ -48,7 +48,7 @@ def full_generated_input_fn(params, is_training):
             img_name = params['data_set'] + '/' + ls[0]
             text = ' '.join(ls[1:])
             label = charset.string_to_label(text)
-            if len(label) < 2:
+            if len(label) < 1:
                 continue
             inputs.append([img_name, text])
 
@@ -72,35 +72,26 @@ def full_generated_input_fn(params, is_training):
             filename = str(filename_label[0], encoding='UTF-8')
             label = str(filename_label[1], encoding='UTF-8')
             label = charset.string_to_label(label)
-            image = PIL.Image.open(filename)
-            width, height = image.size
-            min_ration = 10.0 / float(min(width, height))
-            max_ratio = max(min_ration, 1.0)
-            ratio = random.random() * (max_ratio - min_ration) + min_ration
-            width = int(math.ceil(ratio * width))
-            height = int(math.ceil(ratio * height))
-            image = image.resize((width, height))
-            ration_w = max(width / max_width, 1.0)
-            ration_h = max(height / 32.0, 1.0)
-            ratio = max(ration_h, ration_w)
-            if ratio > 1:
-                width = int(width / ratio)
-                height = int(height / ratio)
-                image = image.resize((width, height))
-            image = np.asarray(image)
-            pw = max(0, max_width - image.shape[1])
-            ph = max(0, 32 - image.shape[0])
-            image = np.pad(image, ((0, ph), (0, pw), (0, 0)), 'constant', constant_values=0)
-            image = image.astype(np.float32) / 127.5 - 1
+            image = cv2.imread(filename)
+            image = image[:,:,::-1]
             return image, np.array(label, dtype=np.int32)
 
-        dataset = dataset.map(
-            lambda filename_label: tuple(tf.py_func(_decode, [filename_label], [tf.float32, tf.int32])),
-            num_parallel_calls=1)
+        def _norm_image(image, labels):
+            image,inference_w = normalize_image(image)
+            return image,inference_w,labels
 
-        dataset = dataset.padded_batch(batch_size, padded_shapes=([32, max_width, 3], [None]))
-        dataset = dataset.map(_features_labels, num_parallel_calls=1)
-        dataset = dataset.prefetch(2)
+        dataset = dataset.map(
+            lambda filename_label: tuple(tf.py_func(_decode, [filename_label], [tf.uint8, tf.int32])),
+            num_parallel_calls=1)
+        dataset = dataset.map(_norm_image)
+
+        def _fileter(_img,inference_w,labels):
+            return tf.logical_and(tf.not_equal(0, tf.reduce_sum(labels)),tf.greater(inference_w,12))
+
+        dataset = dataset.filter(_fileter)
+        dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(1000))
+        dataset = dataset.padded_batch(batch_size, padded_shapes=([32, None,1],tf.TensorShape([]),[None]),padding_values=(0.0,0,charset.num_classes()+1))
+        dataset = dataset.map(_features)
         return dataset
 
     return _input_fn
