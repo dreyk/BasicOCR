@@ -36,7 +36,6 @@ def get_input_fn(dataset_type):
 
 def full_generated_input_fn(params, is_training):
     logging.info('Use full generated')
-    max_width = params['max_width']
     batch_size = params['batch_size']
     inputs = []
     with open(params['data_set'] + '/labels.txt', 'r') as f:
@@ -65,23 +64,21 @@ def full_generated_input_fn(params, is_training):
                 shuffle_size = 10
             dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(shuffle_size))
 
-        def _features_labels(images, labels):
-            return images, labels
-
         def _decode(filename_label):
             filename = str(filename_label[0], encoding='UTF-8')
             label = str(filename_label[1], encoding='UTF-8')
             label = charset.string_to_label(label)
             image = cv2.imread(filename)
             image = image[:,:,::-1]
-            return image, np.array(label, dtype=np.int32)
+            return image,image.shape[0],image.shape[1], np.array(label, dtype=np.int32)
 
-        def _norm_image(image, labels):
+        def _norm_image(image,height,width, labels):
+            image = tf.reshape(image,[height,width,3])
             image,inference_w = normalize_image(image)
             return image,inference_w,labels
 
         dataset = dataset.map(
-            lambda filename_label: tuple(tf.py_func(_decode, [filename_label], [tf.uint8, tf.int32])),
+            lambda filename_label: tuple(tf.py_func(_decode, [filename_label], [tf.uint8,np.int32,np.int32, tf.int32])),
             num_parallel_calls=1)
         dataset = dataset.map(_norm_image)
 
