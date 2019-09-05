@@ -70,7 +70,7 @@ def full_generated_input_fn(params, is_training):
             label = charset.string_to_label(label)
             image = cv2.imread(filename)
             image = image[:,:,::-1]
-            return image,int(image.shape[0]),int(image.shape[1]), np.array(label, dtype=np.int32)
+            return image,np.int32(image.shape[0]),np.int32(image.shape[1]), np.array(label, dtype=np.int32)
 
         def _norm_image(image,height,width, labels):
             image = tf.reshape(image,[height,width,3])
