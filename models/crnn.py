@@ -78,7 +78,7 @@ def full_generated_input_fn(params, is_training):
             return image,inference_w,labels
 
         dataset = dataset.map(
-            lambda filename_label: tuple(tf.py_func(_decode, [filename_label], [tf.uint8,np.int32,np.int32, tf.int32])),
+            lambda filename_label: tuple(tf.py_func(_decode, [filename_label], [tf.uint8,tf.int32,tf.int32, tf.int32])),
             num_parallel_calls=1)
         dataset = dataset.map(_norm_image)
 
