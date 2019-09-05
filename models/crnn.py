@@ -548,6 +548,18 @@ def _crnn_model_fn(features, labels, mode, params=None, config=None):
                 #    optimizer=optimizer,variables=rnn_vars)
 
                 tf.summary.scalar('learning_rate', learning_rate_tensor)
+    else:
+        decoded, _log_prob = tf.nn.ctc_beam_search_decoder(logits, sequence_length, merge_repeated=False)
+        prediction = tf.to_int32(decoded[0])
+        predictions = tf.sparse_to_dense(tf.to_int32(prediction.indices),
+                                         tf.to_int32(prediction.dense_shape),
+                                         tf.to_int32(prediction.values),
+                                         default_value=-1,
+                                         name="output")
+        export_outputs = {
+            tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: tf.estimator.export.PredictOutput(
+                predictions)}
+
     return tf.estimator.EstimatorSpec(
         mode=mode,
         predictions=predictions,
